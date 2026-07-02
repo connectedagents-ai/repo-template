@@ -1,1 +1,1 @@
-> **MOVED** → This repository has moved to [Connected-Energy-AI/repo-template](https://github.com/Connected-Energy-AI/repo-template)
+> **MOVED** → This repository has moved to [Connected-Energy-AI/repo-template](https://github.com/Connected-Energy-AI/repo-template)> **MOVED** → This repository has moved to [Connected-Energy-AI/repo-template](https://github.com/Connected-Energy-AI/repo-template)
