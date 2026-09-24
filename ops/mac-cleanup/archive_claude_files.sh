@@ -11,7 +11,7 @@
 #   PRUNE_MCP="git shell" bash archive_claude_files.sh --prune-mcp   # custom list
 #
 # Quit Claude Desktop and every running `claude` session before --apply.
-# Compatible with macOS /bin/bash 3.2.
+# Compatible with macOS /bin/bash 3.2. Loops read from < <(find ...) so a STOP exits the whole script, not a subshell.
 
 set -u
 APPLY=0
@@ -113,12 +113,12 @@ say ""
 
 say "3) Session transcripts idle > $IDLE_DAYS days (~/.claude/projects)"
 if [ -d "$HOME/.claude/projects" ]; then
-  find "$HOME/.claude/projects" -mindepth 1 -maxdepth 1 -type d -mtime +"$IDLE_DAYS" 2>/dev/null | while IFS= read -r d; do
+  while IFS= read -r d; do
     # a project dir is idle only if nothing inside changed recently either
     if [ -z "$(find "$d" -type f -mtime -"$IDLE_DAYS" -print -quit 2>/dev/null)" ]; then
       archive "$d" "idle transcript"
     fi
-  done
+  done < <(find "$HOME/.claude/projects" -mindepth 1 -maxdepth 1 -type d -mtime +"$IDLE_DAYS" 2>/dev/null)
 fi
 say ""
 
@@ -132,19 +132,19 @@ say ""
 
 say "5) Old Claude Desktop logs (> $IDLE_DAYS days)"
 if [ -d "$HOME/Library/Logs/Claude" ]; then
-  find "$HOME/Library/Logs/Claude" -type f -name '*.log*' -mtime +"$IDLE_DAYS" 2>/dev/null | while IFS= read -r f; do
+  while IFS= read -r f; do
     archive "$f" "old log"
-  done
+  done < <(find "$HOME/Library/Logs/Claude" -type f -name '*.log*' -mtime +"$IDLE_DAYS" 2>/dev/null)
 fi
 say ""
 
 say "6) Stray config copies outside their real homes"
-find "$HOME" -maxdepth "$DEPTH" \
+while IFS= read -r f; do
+  archive "$f" "stray copy"
+done < <(find "$HOME" -maxdepth "$DEPTH" \
   \( -path "$HOME/Library" -o -path "$HOME/.Trash" -o -path "$HOME/.claude" -o -path "$HOME/Archive" -o -name node_modules -o -name .git -o -name .venv \) -prune -o \
   -type f \( -name 'claude_desktop_config*.json' -o -name 'claude_desktop_config*.bak' -o -name 'CLAUDE.md.bak' -o -name 'CLAUDE.md.old' -o -name 'CLAUDE copy*.md' -o -name 'CLAUDE (*).md' \) \
-  -print 2>/dev/null | while IFS= read -r f; do
-    archive "$f" "stray copy"
-  done
+  -print 2>/dev/null)
 say "  (CLAUDE.md files inside real git repos are LEFT ALONE — review them from the audit report.)"
 say ""
 

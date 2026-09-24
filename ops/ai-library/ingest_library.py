@@ -104,6 +104,10 @@ def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
     return n
 
 
+class NoRoom(Exception):
+    pass
+
+
 def ensure_room(dest: Path, need: int, min_free_gb: float):
     """Stop before a copy that would leave less than min_free_gb free on dest's disk."""
     probe = dest
@@ -111,7 +115,7 @@ def ensure_room(dest: Path, need: int, min_free_gb: float):
         probe = probe.parent
     free = shutil.disk_usage(probe).free
     if free - need < min_free_gb * 1024**3:
-        sys.exit(f"STOP: copying {need / 1e9:.2f} GB more would leave less than {min_free_gb} GB free on {probe} "
+        raise NoRoom(f"STOP: copying {need / 1e9:.2f} GB more would leave less than {min_free_gb} GB free on {probe} "
                  f"({free / 1e9:.1f} GB free now). Nothing further was copied. Use --library /Volumes/<SSD>/ai-library-raw.")
 
 
@@ -169,53 +173,58 @@ def main():
         else:
             print(f"missing: {inp}", file=sys.stderr)
 
-    for root, origin in roots:
-        files = [root] if root.is_file() else None
-        if files is None:
-            files = []
-            for d, dirnames, filenames in walk(root):
-                if "SKILL.md" in filenames and d != root.parent:
-                    dest = lib / "skills" / slug(d.name)
-                    k = 1
-                    while dest.exists():
-                        dest = dest.with_name(f"{slug(d.name)}-{k}"); k += 1
-                    print(f"skill      {d} → {dest.relative_to(lib)}")
-                    stats["skills"] += 1
-                    if a.apply:
-                        ensure_room(dest, tree_size(d), a.min_free_gb)
-                        shutil.copytree(d, dest, ignore=shutil.ignore_patterns(*SKIP_DIRS, ".env*"))
-                    dirnames[:] = []
+    stopped = None
+    try:
+        for root, origin in roots:
+            files = [root] if root.is_file() else None
+            if files is None:
+                files = []
+                for d, dirnames, filenames in walk(root):
+                    if "SKILL.md" in filenames and d != root.parent:
+                        dest = lib / "skills" / slug(d.name)
+                        k = 1
+                        while dest.exists():
+                            dest = dest.with_name(f"{slug(d.name)}-{k}"); k += 1
+                        print(f"skill      {d} → {dest.relative_to(lib)}")
+                        stats["skills"] += 1
+                        if a.apply:
+                            ensure_room(dest, tree_size(d), a.min_free_gb)
+                            shutil.copytree(d, dest, ignore=shutil.ignore_patterns(*SKIP_DIRS, ".env*"))
+                        dirnames[:] = []
+                        continue
+                    files += [d / f for f in filenames if f != ".DS_Store"]
+            for f in files:
+                if looks_secret(f):
+                    stats["skipped-secret"] += 1
+                    print(f"skip-secret {f}")
                     continue
-                files += [d / f for f in filenames if f != ".DS_Store"]
-        for f in files:
-            if looks_secret(f):
-                stats["skipped-secret"] += 1
-                print(f"skip-secret {f}")
-                continue
-            h = sha256(f)
-            orig = str(origin / f.relative_to(root)) if root.is_dir() else str(origin)
-            if h in by_hash:
-                stats["duplicate"] += 1
-                if orig not in by_hash[h]["origins"]:
-                    by_hash[h]["origins"].append(orig)
-                continue
-            k = kind_of(f)
-            dest = lib / "sources" / slug(a.source) / slug(a.account) / k / slug(f.name)
-            n = 1
-            while dest.exists():
-                dest = dest.with_name(f"{dest.stem}-{n}{dest.suffix}"); n += 1
-            print(f"new        [{k:9}] {orig} → {dest.relative_to(lib)}")
-            stats["new"] += 1
-            entry = {"sha256": h, "path": str(dest.relative_to(lib)), "source": a.source, "account": a.account, "kind": k,
-                     "title": f.stem, "ingested": today, "bytes": f.stat().st_size, "origins": [orig]}
-            by_hash[h] = entry
-            if a.apply:
-                ensure_room(dest, f.stat().st_size, a.min_free_gb)
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(f, dest)
-                catalog[entry["path"]] = entry
-            if f.name == "conversations.json":
-                stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, lib / "sources" / slug(a.source) / slug(a.account) / "chats", a.apply)
+                h = sha256(f)
+                orig = str(origin / f.relative_to(root)) if root.is_dir() else str(origin)
+                if h in by_hash:
+                    stats["duplicate"] += 1
+                    if orig not in by_hash[h]["origins"]:
+                        by_hash[h]["origins"].append(orig)
+                    continue
+                k = kind_of(f)
+                dest = lib / "sources" / slug(a.source) / slug(a.account) / k / slug(f.name)
+                n = 1
+                while dest.exists():
+                    dest = dest.with_name(f"{dest.stem}-{n}{dest.suffix}"); n += 1
+                print(f"new        [{k:9}] {orig} → {dest.relative_to(lib)}")
+                stats["new"] += 1
+                entry = {"sha256": h, "path": str(dest.relative_to(lib)), "source": a.source, "account": a.account, "kind": k,
+                         "title": f.stem, "ingested": today, "bytes": f.stat().st_size, "origins": [orig]}
+                by_hash[h] = entry
+                if a.apply:
+                    ensure_room(dest, f.stat().st_size, a.min_free_gb)
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy2(f, dest)
+                    catalog[entry["path"]] = entry
+                if f.name == "conversations.json":
+                    stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, lib / "sources" / slug(a.source) / slug(a.account) / "chats", a.apply)
+
+    except NoRoom as e:  # keep the catalog consistent with what was already copied
+        stopped = str(e)
 
     if a.apply:
         lib.mkdir(parents=True, exist_ok=True)
@@ -243,6 +252,8 @@ def main():
     print("\n" + "  ".join(f"{k}: {v}" for k, v in stats.items()))
     if not a.apply:
         print("Dry run. Re-run with --apply to copy into", lib)
+    if stopped:
+        sys.exit(stopped + " Files copied before the stop are recorded in catalog.json.")
 
 
 if __name__ == "__main__":
