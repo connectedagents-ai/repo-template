@@ -5,7 +5,7 @@
 # Exits non-zero if the token is missing or doesn't authenticate, so a broken setup is visible instead of silent.
 set -eu
 OP_VERSION="${OP_VERSION:-v2.30.0}"   # bump to the current release from app-updates.agilebits.com/product_history/CLI2
-OP_KEY="3FEF9748469ADBE15DA7CA80AC2D62742012EA22"   # 1Password CLI signing key (developer.1password.com/docs/cli/verify)
+OP_SIGNER_FPR="3FEF9748469ADBE15DA7CA80AC2D62742012EA22"   # 1Password CLI signing key (developer.1password.com/docs/cli/verify) gitleaks:allow (public)
 
 if ! command -v op >/dev/null; then
   command -v gpg >/dev/null || { echo "gpg is required to verify the 1Password CLI; install gnupg first" >&2; exit 1; }
@@ -14,9 +14,9 @@ if ! command -v op >/dev/null; then
   curl -fsSL -o "$TMP/op.zip" "https://cache.agilebits.com/dist/1P/op2/pkg/${OP_VERSION}/op_linux_${ARCH}_${OP_VERSION}.zip"
   unzip -q -o "$TMP/op.zip" -d "$TMP"
   export GNUPGHOME="$TMP/gnupg"; mkdir -m 700 "$GNUPGHOME"
-  gpg --batch --quiet --keyserver hkps://keyserver.ubuntu.com --receive-keys "$OP_KEY"
+  gpg --batch --quiet --keyserver hkps://keyserver.ubuntu.com --receive-keys "$OP_SIGNER_FPR"
   gpg --batch --quiet --verify "$TMP/op.sig" "$TMP/op" 2>"$TMP/verify.log" \
-    && grep -q "$OP_KEY" <(gpg --batch --status-fd 1 --verify "$TMP/op.sig" "$TMP/op" 2>/dev/null) \
+    && grep -q "$OP_SIGNER_FPR" <(gpg --batch --status-fd 1 --verify "$TMP/op.sig" "$TMP/op" 2>/dev/null) \
     || { cat "$TMP/verify.log" >&2; echo "1Password CLI signature did NOT verify; not installing" >&2; exit 1; }
   install -m 0755 "$TMP/op" /usr/local/bin/op
 fi
