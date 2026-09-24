@@ -51,11 +51,22 @@ for SRC in "$@"; do
       # Archived repos are read-only and cannot be transferred: unarchive, move, re-archive.
       [ "$archived" = true ] && gh repo unarchive "$SRC/$name" --yes >/dev/null
       if gh api -X POST "repos/$SRC/$name/transfer" -f new_owner="$TARGET" >/dev/null; then
-        sleep 3
-        [ "$archived" = true ] && gh repo archive "$TARGET/$name" --yes >/dev/null
+        # transfers are asynchronous: wait (up to ~2 min) until the repo answers under the new owner
+        tries=0
+        until gh api "repos/$TARGET/$name" --jq .full_name 2>/dev/null | grep -qix "$TARGET/$name" || [ "$tries" -ge 24 ]; do
+          sleep 5; tries=$((tries + 1))
+        done
         echo "    ✓ moved → $TARGET/$name"
+        if [ "$archived" = true ]; then
+          gh repo archive "$TARGET/$name" --yes >/dev/null 2>&1 \
+            || echo "    ⚠ transferred but NOT re-archived: run  gh repo archive $TARGET/$name --yes" >&2
+        fi
       else
         echo "    ✗ transfer failed for $SRC/$name (check org 'allow repo transfer' setting / your admin rights)" >&2
+        if [ "$archived" = true ]; then
+          gh repo archive "$SRC/$name" --yes >/dev/null 2>&1 \
+            || echo "    ⚠ could not re-archive $SRC/$name: run  gh repo archive $SRC/$name --yes" >&2
+        fi
       fi
     fi
   done

@@ -26,7 +26,20 @@ KINDS = {
     "media": {".png", ".jpg", ".jpeg", ".gif", ".webp", ".svg", ".mp3", ".mp4", ".wav", ".mov"},
 }
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".next", "dist", "build", ".DS_Store"}
-SECRET = re.compile(r"(^\.env)|(\.pem$)|(\.key$)|(\.p12$)|(^id_(rsa|ed25519))|credential|secret|password|token", re.I)
+SECRET = re.compile(r"(^\.env)|(\.pem$)|(\.p12$)|(^id_(rsa|ed25519))|credential|secret|password|token", re.I)
+
+
+def looks_secret(p: Path) -> bool:
+    """Name-based secret check; a .key file is a secret only if it is a PEM key (Keynote .key files are not)."""
+    if SECRET.search(p.name):
+        return True
+    if p.suffix.lower() == ".key":
+        try:
+            with p.open("rb") as f:
+                return f.read(64).lstrip().startswith(b"-----BEGIN")
+        except OSError:
+            return True
+    return False
 
 
 def kind_of(p: Path) -> str:
@@ -154,7 +167,7 @@ def main():
                     continue
                 files += [d / f for f in filenames if f != ".DS_Store"]
         for f in files:
-            if SECRET.search(f.name):
+            if looks_secret(f):
                 stats["skipped-secret"] += 1
                 print(f"skip-secret {f}")
                 continue
