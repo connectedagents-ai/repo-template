@@ -19,6 +19,23 @@ class FindPlaintextKeysTest(TempDirTest):
         for absent in ("ANTHROPIC_API_KEY", "GH_TOKEN", "STRIPE_SECRET_KEY", "fake-openai-value-1", "fake-xai-value-3"):
             self.assertNotIn(absent, r.stdout)
 
+    def test_path_variables_are_not_keys_but_pat_is(self):
+        rc = self.tmp / ".zshrc"
+        rc.write_text('export PATH="/opt/homebrew/bin:/usr/bin"\nexport PYTHONPATH=/Users/me/code/lib\n'
+                      'export GITHUB_PAT=fake-github-value-5\n')
+        r = self.run_py(FIND, "--no-defaults", rc)
+        self.assertIn("GITHUB_PAT", r.stdout)
+        self.assertNotIn("PATH ", r.stdout.replace("GITHUB_PAT", ""))
+        self.assertEqual(r.stdout.count("\n- "), 1)
+
+    def test_npmrc_registry_tokens_are_found(self):
+        rc = self.tmp / ".npmrc"
+        rc.write_text("//registry.npmjs.org/:_authToken=fake-npm-value-6\n//npm.pkg.github.com/:_authToken=${GH_PKG}\n")
+        r = self.run_py(FIND, "--no-defaults", rc)
+        self.assertIn("//registry.npmjs.org/:_authToken", r.stdout)
+        self.assertIn("npmjs.com/settings", r.stdout)
+        self.assertNotIn("npm.pkg.github.com", r.stdout)
+
     def test_committed_key_is_flagged_and_exits_nonzero(self):
         repo = self.tmp / "repo"
         repo.mkdir()

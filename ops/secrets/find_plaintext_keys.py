@@ -11,9 +11,12 @@ import argparse, os, re, subprocess, sys
 from pathlib import Path
 
 HOME = Path.home()
-NAME = r"[A-Za-z0-9_.-]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|PAT|CREDENTIAL)[A-Za-z0-9_.-]*"
+# PAT only as its own word part (GITHUB_PAT, PAT_2), so PATH/PYTHONPATH don't count
+NAME = r"[A-Za-z0-9_.-]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PAT(?![A-Za-z]))[A-Za-z0-9_.-]*"
 # NAME=value · export NAME=value · NAME = "value" (TOML) · "name": "value" (JSON)
 ASSIGN = re.compile(rf"""^\s*(?:export\s+)?["']?({NAME})["']?\s*[:=]\s*["']?([^"'\s#,]+)""", re.I)
+# .npmrc registry auth: //registry.npmjs.org/:_authToken=value
+NPMRC = re.compile(r"^\s*(//[^\s=]+:(?:_authToken|_auth|_password))\s*=\s*[\"']?([^\"'\s]+)")
 REFERENCE = ("op://", "$(", "${", "$", "<", "your", "xxx", "changeme", "replace", "example", "none", "null", "true", "false")
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", "Library", ".Trash"}
 CANDIDATE = re.compile(r"(^\.env(?!\.example$)|\.env$|rc$|profile$|config\.toml$|settings\.json$|mcp.*\.json$|claude_desktop_config.*\.json$|\.json$)", re.I)
@@ -30,6 +33,7 @@ ROTATE = [
     ("PERPLEXITY|PPLX", "https://www.perplexity.ai/settings/api"),
     ("NOTION", "https://www.notion.so/profile/integrations"),
     ("OPENROUTER", "https://openrouter.ai/settings/keys"),
+    ("_authToken|_auth|_password|NPM", "https://www.npmjs.com/settings/~/tokens"),
     ("SUPABASE", "https://supabase.com/dashboard/account/tokens"),
     ("TWILIO", "https://console.twilio.com"),
 ]
@@ -60,7 +64,7 @@ def scan_file(path):
     try:
         with open(path, encoding="utf-8", errors="replace") as f:
             for n, line in enumerate(f, 1):
-                m = ASSIGN.match(line)
+                m = ASSIGN.match(line) or NPMRC.match(line)
                 if m and is_plaintext(m.group(2)):
                     yield n, m.group(1)
     except OSError:
