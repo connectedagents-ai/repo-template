@@ -1,5 +1,11 @@
 # Dedup across every surface (Mac + cloud folders + iCloud): dry run first
 
+**Beginner? Run just this** (plug in your external SSD first). It checks your setup, asks which drive to use, scans, and shows the report. Nothing moves:
+```bash
+cd ~/Code/connectedagents-ai/repo-template && git pull
+bash ops/dedup/start_here.sh
+```
+
 ```bash
 OUT=/Volumes/<ExternalSSD>/dedup-runs bash ops/dedup/run_dedup.sh     # parallel scan per surface → merge → PLAN.md
 python3 ops/dedup/dedup_apply.py --plan <run>/duplicates.csv --archive-root /Volumes/<ExternalSSD>/Dedup-Archive          # dry run
