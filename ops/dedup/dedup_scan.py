@@ -15,7 +15,8 @@ from pathlib import Path
 
 SF_DATALESS = 0x40000000  # macOS: file content is not on disk (cloud placeholder)
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".next", "dist", "build", ".turbo", ".cache",
-             ".Trash", ".DocumentRevisions-V100", ".Spotlight-V100", ".fseventsd"}
+             ".Trash", ".Trashes", ".DocumentRevisions-V100", ".Spotlight-V100", ".fseventsd", ".TemporaryItems",
+             "dedup-runs", "Dedup-Archive"}
 SKIP_SUFFIXES = (".app", ".photoslibrary", ".musiclibrary", ".tvlibrary", ".bundle", ".framework", ".xcarchive")
 DEFAULT_LEGAL = (r"tesla|connected[ _-]?solar|netzero|net[ _-]?zero|dorellyn|mullins|abad|vikta|blair|litigat|lawsuit|"
                  r"court|legal|privileged|deposition|subpoena|discovery[ _-]?production|evidence|golden[ _-]?packet")
@@ -41,8 +42,10 @@ def main():
             if not root.exists():
                 print(f"  skip missing root {root}", file=sys.stderr)
                 continue
-            for dirpath, dirnames, filenames in os.walk(root, onerror=lambda e: None):
-                dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.endswith(SKIP_SUFFIXES)]
+            root_dev = os.stat(root).st_dev
+            for dirpath, dirnames, filenames in os.walk(root, onerror=lambda e: None):  # does not follow symlinks
+                dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.endswith(SKIP_SUFFIXES)
+                               and os.lstat(os.path.join(dirpath, d)).st_dev == root_dev]  # stay on this volume
                 for name in filenames:
                     if name == ".DS_Store":
                         continue

@@ -61,8 +61,14 @@ say ""
 snapshot() {
   src="$1"; [ -e "$src" ] || return 0
   rel="${src#$HOME/}"
-  say "  snapshot  ~/$rel"
+  say "  snapshot  ~/$rel  ($(du -sh "$src" 2>/dev/null | cut -f1))"
   [ "$APPLY" = 1 ] || return 0
+  need_kb=$(du -sk "$src" 2>/dev/null | cut -f1)
+  free_kb=$(df -k "$DEST" | awk 'NR==2 {print $4}')
+  if [ $((free_kb - need_kb)) -lt $(( ${MIN_FREE_GB:-15} * 1024 * 1024 )) ]; then
+    say "  ✋ STOP: snapshot of ~/$rel would leave less than ${MIN_FREE_GB:-15} GB free. Set ARCHIVE_ROOT=/Volumes/<SSD>/Archive and re-run." >&2
+    exit 1
+  fi
   mkdir -p "$DEST/snapshot/$(dirname "$rel")"
   cp -Rp "$src" "$DEST/snapshot/$rel"
   printf 'snapshot\t%s\t%s\n' "$src" "$DEST/snapshot/$rel" >> "$MANIFEST"

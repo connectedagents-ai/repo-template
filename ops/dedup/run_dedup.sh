@@ -3,6 +3,8 @@
 #
 #   bash ops/dedup/run_dedup.sh                      # all surfaces → ~/dedup-runs/<stamp>/ (report only)
 #   OUT=/Volumes/ExtremeSSD/dedup-runs bash ops/dedup/run_dedup.sh   # keep reports off the internal disk
+#   SSD_ROOT="/Volumes/Extreme SSD" OUT=... bash ops/dedup/run_dedup.sh   # also scan the SSD itself (read-only);
+#     SSD copies are preferred as keepers, so Mac copies of SSD files show up as the ones to archive
 #
 # Surfaces: mac-local (Desktop, Documents, Downloads, ~/Code), each ~/Library/CloudStorage/* folder (Google Drive,
 # OneDrive, Dropbox, Box), and iCloud Drive (metadata only: cloud-only files are never downloaded or hashed).
@@ -23,6 +25,7 @@ for d in "$HOME"/Library/CloudStorage/*; do
   [ -d "$d" ] || continue
   scan --surface "$(label "$d")" --root "$d"
 done
+[ -n "${SSD_ROOT:-}" ] && [ -d "$SSD_ROOT" ] && scan --surface ssd --root "$SSD_ROOT"
 ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
 [ -d "$ICLOUD" ] && scan --surface icloud-drive --root "$ICLOUD"
 
@@ -31,7 +34,7 @@ for p in $pids; do wait "$p" || fail=1; done
 cat "$RUN/scan.log"
 [ "$fail" = 0 ] || echo "⚠ one or more scanners failed; see $RUN/scan.log"
 
-PREFER="--prefer mac-local"
+PREFER="$( [ -n "${SSD_ROOT:-}" ] && echo "--prefer ssd") --prefer mac-local"
 for d in "$HOME"/Library/CloudStorage/*; do [ -d "$d" ] && PREFER="$PREFER --prefer $(label "$d")"; done
 # shellcheck disable=SC2086
 python3 "$HERE/dedup_merge.py" --in "$RUN" $PREFER --prefer icloud-drive

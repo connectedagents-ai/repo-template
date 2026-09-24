@@ -17,6 +17,9 @@ INBOX="${INBOX:-$HOME/Code/connectedagents-ai/ai-workspace-inbox}"
 
 EXCLUDES="--exclude=node_modules --exclude=.venv --exclude=venv --exclude=__pycache__ --exclude=.next --exclude=dist --exclude=build --exclude=.turbo --exclude=.DS_Store --exclude=.env --exclude=.env.* --exclude=*.pem --exclude=*.key --exclude=*.p12 --exclude=id_rsa* --exclude=id_ed25519* --exclude=*.sqlite --exclude=*.log"
 
+MIN_FREE_GB="${MIN_FREE_GB:-15}"   # never let a copy leave the destination disk with less than this free
+PLANNED=""
+
 [ "$APPLY" = 1 ] && mkdir -p "$INBOX" && [ ! -d "$INBOX/.git" ] && git -C "$INBOX" init -q -b main && \
   printf '# AI workspace inbox\n\nCode rescued from AI tool scratch folders. Triage: promote to a product repo or leave archived here.\n' > "$INBOX/README.md"
 
@@ -40,8 +43,17 @@ for spec in \
       printf 'push-it   %-12s %s  (git repo with remote: commit + push there, then migrate)\n' "$tool" "${d#$HOME/}"
       continue
     fi
-    printf 'collect   %-12s %s → %s\n' "$tool" "${d#$HOME/}" "${INBOX#$HOME/}/$tool/$name"
+    printf 'collect   %-12s %s → %s  (%s)\n' "$tool" "${d#$HOME/}" "${INBOX#$HOME/}/$tool/$name" "$(du -sh "$d" 2>/dev/null | cut -f1)"
+    PLANNED="$PLANNED
+$d"
     if [ "$APPLY" = 1 ]; then
+      need_kb=$(du -sk "$d" 2>/dev/null | cut -f1)
+      free_kb=$(df -k "$(dirname "$INBOX")" | awk 'NR==2 {print $4}')
+      if [ $((free_kb - need_kb)) -lt $((MIN_FREE_GB * 1024 * 1024)) ]; then
+        echo "  ✋ STOP: copying ${d#$HOME/} ($((need_kb / 1024)) MB) would leave less than ${MIN_FREE_GB} GB free. Nothing more will be copied." >&2
+        echo "     Set INBOX=/Volumes/<SSD>/ai-workspace-inbox to collect onto an external drive instead." >&2
+        exit 1
+      fi
       mkdir -p "$INBOX/$tool/$name"
       # shellcheck disable=SC2086
       rsync -a $EXCLUDES --exclude=.git "$d/" "$INBOX/$tool/$name/"

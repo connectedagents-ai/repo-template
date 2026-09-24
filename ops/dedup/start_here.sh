@@ -46,8 +46,12 @@ SSD="${drives[$((choice - 1))]}"
 [ -w "$SSD" ] || stop "Can't write to $(basename "$SSD"). Check the drive isn't read-only (Finder → Get Info)."
 ok "Report will be saved on: $(basename "$SSD")"
 
-say "3/5 Scanning your Mac, cloud folders and iCloud (this can take a while — leave this window open)"
-OUT="$SSD/dedup-runs" bash "$HERE/run_dedup.sh" || stop "The scan stopped with an error. Copy everything above and paste it into Claude."
+printf '\n  Also scan the SSD itself, to find Mac files that are copies of SSD files? (y/n): '; read -r inc
+case "$inc" in y|Y|yes|YES) SSD_ROOT="$SSD"; ok "The SSD will be scanned too (read-only). SSD copies are kept; Mac copies are the ones proposed for archive.";;
+  *) SSD_ROOT=""; ok "Scanning the Mac, cloud folders and iCloud only.";; esac
+
+say "3/5 Scanning (this can take a while — leave this window open)"
+SSD_ROOT="$SSD_ROOT" OUT="$SSD/dedup-runs" bash "$HERE/run_dedup.sh" || stop "The scan stopped with an error. Copy everything above and paste it into Claude."
 RUN="$(ls -td "$SSD"/dedup-runs/*/ 2>/dev/null | head -1)"; RUN="${RUN%/}"
 [ -f "$RUN/PLAN.md" ] || stop "No report was produced. Copy everything above and paste it into Claude."
 

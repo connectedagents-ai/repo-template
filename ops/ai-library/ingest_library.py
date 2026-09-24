@@ -117,6 +117,7 @@ def main():
     ap.add_argument("--account", default="default", help="which login this export came from, e.g. personal | team | teams | enterprise | api | work-email")
     ap.add_argument("--library", type=Path, default=Path.home() / "Archive/ai-library-raw",
                     help="raw export store: private, NOT a git repo. Promote reviewed items into the ai-library repo by hand")
+    ap.add_argument("--min-free-gb", type=float, default=15, help="refuse to copy if less than this would remain free")
     ap.add_argument("--allow-git", action="store_true", help="allow --library inside a git work tree (only for sanitized input)")
     ap.add_argument("--apply", action="store_true")
     a = ap.parse_args()
@@ -148,6 +149,16 @@ def main():
             roots.append((inp, inp))
         else:
             print(f"missing: {inp}", file=sys.stderr)
+
+    if a.apply:
+        need = sum(f.stat().st_size for r, _ in roots for f in ([r] if r.is_file() else r.rglob("*")) if f.is_file())
+        probe = lib if lib.exists() else lib.parent
+        while not probe.exists():
+            probe = probe.parent
+        free = shutil.disk_usage(probe).free
+        if free - need < a.min_free_gb * 1024**3:
+            sys.exit(f"STOP: copying {need / 1e9:.1f} GB into {lib} would leave less than {a.min_free_gb} GB free "
+                     f"({free / 1e9:.1f} GB free now). Nothing was copied. Use --library /Volumes/<SSD>/ai-library-raw instead.")
 
     for root, origin in roots:
         files = [root] if root.is_file() else None
