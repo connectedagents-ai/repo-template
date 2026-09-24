@@ -11,6 +11,7 @@ Everything here is **dry-run by default**, copies or archives instead of deletin
 | 1 | Audit the Mac: Claude, Codex, Cursor, Antigravity/Gemini, Grok, Perplexity, ChatGPT and Copilot files, git repos, disk hogs | `bash mac-cleanup/audit_claude_files.sh` → read `~/claude-audit-*.md` |
 | 2 | Rescue agent scratch work into one inbox repo | `bash mac-cleanup/collect_ai_workspaces.sh` → `--apply` |
 | 3 | Archive beginner-era Claude clutter and install the lean Claude Desktop config | `bash mac-cleanup/archive_claude_files.sh` → `--apply --install-desktop-config mac-cleanup/templates/claude_desktop_config.json` (undo: `~/Archive/claude-legacy-*/restore.sh`) |
+| 3b | Reset the Claude app/account itself (export → chats, projects, artifacts, scheduled, skills, connectors, plugins, extensions, memory) | `mac-cleanup/CLAUDE-APP-RESET.md` |
 | 4 | Reset global agent config | copy `mac-cleanup/templates/CLAUDE.md` + `settings.json` into `~/.claude/`. Configure the other CLIs per `../docs/GITHUB-SETUP.md` §4 |
 | 5 | Set up the GitHub org, apps and CLI | `../docs/GITHUB-SETUP.md` |
 | 6 | Move every other org or account into `connectedagents-ai` | `bash github-consolidation/migrate_to_connectedagents.sh Connected-Energy-AI` → `--apply` |
