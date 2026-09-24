@@ -3,7 +3,7 @@
 #   bash check_domains.sh connectedsolar.com getconnectedenergy.com netzerolending.io baileyco.us powerconnection.com
 # Run before and after changes. macOS: dig/whois/curl are built in.
 set -u
-[ $# -ge 1 ] || set -- connectedsolar.com getconnectedenergy.com netzerolending.io baileyco.us connectedenergyservices.com powerconnection.com
+[ $# -ge 1 ] || set -- connectedsolar.com getconnectedenergy.com netzerolending.io baileyco.us connectedenergyservices.com connectedenergy.ai powerconnection.com
 for d in "$@"; do
   echo "=== $d"
   echo "  registrar : $(whois "$d" 2>/dev/null | grep -iE '^ *registrar:' | head -1 | sed 's/.*: *//')"

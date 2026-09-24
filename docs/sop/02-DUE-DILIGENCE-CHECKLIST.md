@@ -41,6 +41,8 @@ Mark each item: ✅ verified (cite evidence) · ⚠️ finding (→ T-04) · ❓
 | D1 | All domains: registrar (Namecheap, GoDaddy, Squarespace, Cloudflare, …), expiry, auto-renew, registrant entity. Registrars are found in browser history and 1Password | D, Q, A |
 | D2 | DNS host (Cloudflare or other), and records for mail, SPF/DKIM/DMARC | A |
 | D3 | Mail systems per domain (M365, Google), and forwarding rules to personal accounts | A |
+| D4 | **Expired, parked or broken-mail domains.** Search the inbox for registrar "parked/canceled/renew" alerts and for mailer-daemon bounces per domain | K (mail search) |
+| D5 | **Critical addresses on each domain:** court e-filing/service contacts, bank, registrar, tax agencies and investors that still send to a legacy address. Re-point them before changing or retiring a domain | K, Q, counsel |
 
 ## E. Cloud platforms and infrastructure
 | # | Check | Tool |
