@@ -35,10 +35,14 @@ The current Desktop config has duplicates (`Filesystem` + `filesystem`), four to
 | **Claude in Chrome** (built-in setting) | browser control. Replaces the failing *Control Chrome* extension |
 | **1Password** | fix it rather than drop it: install `op` and sign in, then point the server at the absolute `/opt/homebrew/bin/op` path |
 | `playwright` (optional) | scripted browser testing |
+| `firecrawl` | web scraping. Move its API key out of the JSON into 1Password |
 
 Remove: `filesystem` (duplicate), `desktop-automation`, `shell`, `applescript`, `git` (Desktop Commander and Claude Code handle git), `github`
 (use the claude.ai **GitHub connector**, not a PAT in plain JSON), `sequential-thinking` (built-in extended thinking replaces it), `sqlite`,
-`email` and *Read and Send iMessages*, unless you actively use them. Use the Gmail connector for email.
+`email` and *Read and Send iMessages* (unless you actively use them; use the Gmail / Microsoft 365 connectors for email), and `grok`
+(an LLM-calling-LLM bridge; keep it only if you ask Claude to call Grok).
+
+Automated: `bash ops/mac-cleanup/archive_claude_files.sh --prune-mcp` (dry run) → `--apply --prune-mcp` (backup + restore.sh).
 
 Most "Server disconnected" errors on a Mac come from Desktop launching with a minimal PATH: `npx` or `node` installed via nvm or Homebrew isn't found.
 Use absolute paths (`/opt/homebrew/bin/npx`), then check `~/Library/Logs/Claude/mcp-server-<name>.log`.

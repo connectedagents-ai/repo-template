@@ -7,6 +7,8 @@
 #   bash archive_claude_files.sh --apply         # do it
 #   IDLE_DAYS=60 bash archive_claude_files.sh    # only archive transcripts idle > 60 days (default 30)
 #   bash archive_claude_files.sh --apply --install-desktop-config templates/claude_desktop_config.json
+#   bash archive_claude_files.sh --apply --prune-mcp        # remove the legacy MCP servers listed in PRUNE_MCP
+#   PRUNE_MCP="git shell" bash archive_claude_files.sh --prune-mcp   # custom list
 #
 # Quit Claude Desktop and every running `claude` session before --apply.
 # Compatible with macOS /bin/bash 3.2.
@@ -14,11 +16,16 @@
 set -u
 APPLY=0
 NEW_DESKTOP_CFG=""
+PRUNE=0
+# Legacy servers from the beginner-era Claude Desktop config: duplicates, overlapping shell tools, broken ones,
+# and ones replaced by built-ins or connectors. Kept: playwright, firecrawl and 1password (fix it: absolute op path + sign in).
+PRUNE_MCP="${PRUNE_MCP:-filesystem memory sequential-thinking github git desktop-automation applescript shell sqlite email grok}"
 while [ $# -gt 0 ]; do
   case "$1" in
     --apply) APPLY=1 ;;
     --install-desktop-config) shift; NEW_DESKTOP_CFG="${1:-}" ;;
-    -h|--help) sed -n '2,13p' "$0"; exit 0 ;;
+    --prune-mcp) PRUNE=1 ;;
+    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
     *) echo "unknown arg: $1" >&2; exit 2 ;;
   esac
   shift
@@ -139,6 +146,36 @@ if [ -n "$NEW_DESKTOP_CFG" ]; then
     cp "$NEW_DESKTOP_CFG" "$DESKTOP_CFG"
     printf 'install\t%s\t%s\n' "$NEW_DESKTOP_CFG" "$DESKTOP_CFG" >> "$MANIFEST"
   fi
+  say ""
+fi
+
+if [ "$PRUNE" = 1 ]; then
+  say "8) Prune legacy MCP servers from Claude Desktop config"
+  if [ ! -f "$DESKTOP_CFG" ]; then say "  no config at $DESKTOP_CFG"
+  elif ! command -v python3 >/dev/null 2>&1; then say "  python3 needed (xcode-select --install)" >&2
+  else
+    APPLY="$APPLY" PRUNE_MCP="$PRUNE_MCP" python3 - "$DESKTOP_CFG" <<'PYEOF'
+import json, os, sys
+path = sys.argv[1]
+cfg = json.load(open(path))
+servers = cfg.get("mcpServers", {})
+drop = set(os.environ["PRUNE_MCP"].split())
+for name in list(servers):
+    if name in drop:
+        print(f"  remove    {name}")
+        if os.environ["APPLY"] == "1":
+            del servers[name]
+    else:
+        env = servers[name].get("env") or {}
+        inline = [k for k, v in env.items() if v and any(w in k.upper() for w in ("KEY", "TOKEN", "SECRET")) and not str(v).startswith("op://")]
+        print(f"  keep      {name}" + (f"   ⚠ inline secret {', '.join(inline)}: move to 1Password" if inline else ""))
+if os.environ["APPLY"] == "1":
+    json.dump(cfg, open(path, "w"), indent=2)
+PYEOF
+    [ "$APPLY" = 1 ] && printf 'cp "%s" "%s"\n' "$DEST/snapshot/${DESKTOP_CFG#$HOME/}" "$DESKTOP_CFG" >> "$RESTORE"
+  fi
+  say "  Extension-managed servers can't be removed here. In Claude Desktop → Settings → Extensions, remove:"
+  say "    Control Chrome (use the built-in Claude in Chrome instead) · Read and Send iMessages (unless you use it)"
   say ""
 fi
 
