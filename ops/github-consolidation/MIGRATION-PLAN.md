@@ -17,6 +17,7 @@
 
 1. **Rotate secrets.** `agent-central-config` has a committed `.env` whose API-key fields (Anthropic, OpenAI, xAI, GitHub PAT, Stripe, Slack, Vercel, Cloudflare, and more) are non-empty. Treat every one as exposed: rotate it in its provider console, store the new value only in 1Password, and turn on **secret scanning + push protection** for the org (see `docs/GITHUB-SETUP.md`). Deleting the file is not enough, because it stays in git history.
 2. **Move case files out of config repos.** `agent-central-config/litigation/` holds about 173 MB of case documents (spreadsheets, emails, BOMs, many duplicate copies). Privileged material belongs in the litigation product's private evidence store (or an encrypted vault), not in a tool-config repo that every Mac and agent clones.
+   **Moving the folder is not enough**: the files stay in every earlier commit and every existing clone. Before anyone clones or consolidates this repo further: (a) with counsel, confirm preservation duties (litigation hold) and copy the originals to the evidence store first; (b) restrict the repo to owners only; (c) purge the path from history with `git filter-repo --path litigation/ --invert-paths`, force-push, and ask GitHub Support to drop cached views; (d) have every machine re-clone and delete old clones; (e) record who had access. Treat step 0 as complete only after (a)–(e).
 
 ## Step 1: transfer `Connected-Energy-AI` → `connectedagents-ai`
 
@@ -25,8 +26,10 @@ bash ops/github-consolidation/migrate_to_connectedagents.sh Connected-Energy-AI 
 bash ops/github-consolidation/migrate_to_connectedagents.sh --apply Connected-Energy-AI  # transfers non-colliding repos
 ```
 
-GitHub transfers keep issues, PRs, stars and history, and leave a redirect from the old URL. You must re-create **Actions
-secrets/variables, webhooks, deploy keys and GitHub App installs** on the new side.
+GitHub transfers keep issues, PRs, stars and history, and leave a redirect from the old URL. Repository-level secrets, webhooks
+and deploy keys stay attached to the repo, so **verify them after the transfer instead of re-creating them** (re-creating a webhook
+would duplicate deliveries). What does *not* carry over is anything scoped to the old **organization**: org-level Actions
+secrets/variables, org webhooks, team permissions and GitHub App installations. Check those on `connectedagents-ai` and add only what is missing.
 
 ### Name collisions: decide per repo (the script never auto-transfers these)
 
@@ -41,7 +44,10 @@ Other accounts (personal users, old orgs): run the same script with their owner 
 ## Step 2: collapse ~280 repos into ~10 domain repos
 
 Target: **one repo per product or domain**, with sub-projects as folders (`apps/`, `packages/`, `agents/`, `docs/`).
-Fold each source in with its history preserved (`merge_into_monorepo.sh`), then **archive** the source (read-only, reversible, nothing is deleted).
+Fold each source in with its history preserved (`merge_into_monorepo.sh`). **Before archiving a source**, handle its outstanding work:
+the fold-in imports only the default branch, so first merge, fold in separately or explicitly abandon every other branch and open PR
+(including agent branches from Step 3; `merge_into_monorepo.sh` lists unmerged branches and stops until you acknowledge them). Only then
+**archive** the source (read-only, reversible, nothing is deleted).
 
 | Target repo | Folds in (examples; verify with the dry-run CSVs) |
 |---|---|

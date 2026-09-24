@@ -13,7 +13,8 @@ Follow `docs/sop/01-CLIENT-ONBOARDING-SOP.md` from the repo that ships this skil
 3. Open T-05 (access log) and record the access you are using.
 
 ## Run (read-only)
-1. `bash ops/client-discovery/run_discovery.sh <client-slug>` → bundle in `~/client-discovery/<client>-<date>/`.
+1. `bash ops/client-discovery/run_discovery.sh <client-slug>` → bundle. Only if clause 4b is ticked, prefix
+   `CONSENT_4B=1 MAIL_ACCOUNTS="<Schedule A mail accounts, comma-separated>"` so browsers, 1Password and Mail are read in `~/client-discovery/<client>-<date>/`.
 2. From a cloud session with connectors, inventory Google Drive, Microsoft 365 / SharePoint, Notion and GitHub (metadata only).
 3. List the exports the client must trigger (`ops/ai-library/README.md`) and track them in T-03 notes.
 

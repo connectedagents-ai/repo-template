@@ -1,15 +1,16 @@
 # Consolidation runbook
 
 Everything here is **dry-run by default**, copies or archives instead of deleting, and logs what it did. Run the steps in order.
+**Run every command from the `ops/` folder:** `cd ~/Code/connectedagents-ai/repo-template/ops` (paths below are relative to it).
 (After consolidation, move `ops/` into `agent-central-config` and delete it from the template.)
 
 | # | Step | Command / doc |
 |---|---|---|
+| 0 | **Rotate exposed secrets** and turn on push protection. **Do this first**: exposed credentials stay usable during every later step until rotated | `github-consolidation/MIGRATION-PLAN.md` step 0 · `../docs/GITHUB-SETUP.md` §1 |
 | 00 | **New client?** Run the full SOP instead: `../docs/sop/01-CLIENT-ONBOARDING-SOP.md` + checklist `02-…` + templates `../docs/sop/templates/`. One-command discovery: `bash client-discovery/run_discovery.sh <client>`. Claude skill: `client-discovery/skill/client-discovery/` (copy to `~/.claude/skills/`) | |
 | 0a | Inventory the cloud stack top-down (Entra → Azure → GCP → GitHub → Vercel → Cloudflare → 1Password), then decide D1–D6 | `bash cloud-inventory/inventory_cloud.sh` · `../docs/CLOUD-ARCHITECTURE.md` |
 | 0b | Point legacy domains at powerconnection.com (web 301 + email via Google Workspace alias domains) | `domains/DOMAIN-CONSOLIDATION.md` · `bash domains/check_domains.sh` |
 | 0c | Set up 1Password for agents (vault map, Touch ID CLI on the Mac, read-only service account for cloud sessions) | `1password/SETUP.md` |
-| 0 | **Rotate exposed secrets** and turn on push protection | `github-consolidation/MIGRATION-PLAN.md` step 0 · `../docs/GITHUB-SETUP.md` §1 |
 | 1 | Audit the Mac: Claude, Codex, Cursor, Antigravity/Gemini, Grok, Perplexity, ChatGPT and Copilot files, git repos, disk hogs | `bash mac-cleanup/audit_claude_files.sh` → read `~/claude-audit-*.md` |
 | 2 | Rescue agent scratch work into one inbox repo | `bash mac-cleanup/collect_ai_workspaces.sh` → `--apply` |
 | 3 | Archive beginner-era Claude clutter and install the lean Claude Desktop config | `bash mac-cleanup/archive_claude_files.sh` → `--apply --install-desktop-config mac-cleanup/templates/claude_desktop_config.json` (undo: `~/Archive/claude-legacy-*/restore.sh`) |

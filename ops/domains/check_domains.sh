@@ -9,8 +9,17 @@ for d in "$@"; do
   echo "  registrar : $(whois "$d" 2>/dev/null | grep -iE '^ *registrar:' | head -1 | sed 's/.*: *//')"
   echo "  expires   : $(whois "$d" 2>/dev/null | grep -iE 'expir' | head -1 | sed 's/.*: *//')"
   echo "  NS        : $(dig +short NS "$d" | tr '\n' ' ')"
-  mx="$(dig +short MX "$d" | sort -n | tr '\n' ' ')"
-  echo "  MX        : ${mx:-(none — domain receives no mail)}"
+  # dig exits non-zero on timeout/SERVFAIL; +short hides NXDOMAIN, so check the status header too
+  mx_raw="$(dig +short +time=5 +tries=2 MX "$d")"; mx_rc=$?
+  status="$(dig +noall +comments +time=5 +tries=2 MX "$d" | grep -oE 'status: [A-Z]+' | head -1 | cut -d' ' -f2)"
+  mx="$(printf '%s\n' "$mx_raw" | grep -v '^;;' | sort -n | tr '\n' ' ' | sed 's/ *$//')"
+  if [ "$mx_rc" -ne 0 ] || [ -z "$status" ]; then
+    echo "  MX        : ⚠ LOOKUP FAILED (dig exit $mx_rc) — unknown, NOT 'no mail'. Re-run before changing anything."
+  elif [ "$status" != "NOERROR" ]; then
+    echo "  MX        : ⚠ DNS status $status — domain may be expired/parked; treat mail as unknown"
+  else
+    echo "  MX        : ${mx:-(none — lookup succeeded, no MX records)}"
+  fi
   case "$mx" in
     *google.com*|*googlemail*) echo "              → mail is on Google Workspace";;
     *outlook.com*|*protection.outlook*) echo "              → mail is on Microsoft 365 (a tenant owns this domain: migrate/remove it there first)";;
@@ -19,5 +28,12 @@ for d in "$@"; do
   echo "  SPF       : $(dig +short TXT "$d" | grep -i 'v=spf1' | tr -d '"')"
   echo "  verif.    : $(dig +short TXT "$d" | grep -ioE '(google-site-verification|MS=ms[0-9]+)' | sort -u | tr '\n' ' ')"
   echo "  DMARC     : $(dig +short TXT "_dmarc.$d" | tr -d '"')"
-  echo "  web       : $(curl -sI -m 10 "http://$d" | grep -iE '^(HTTP|location)' | tr -d '\r' | tr '\n' ' ')"
+  for u in "http://$d" "https://$d" "https://www.$d"; do
+    res="$(curl -sS -o /dev/null -m 10 -w '%{http_code} → %{redirect_url}' "$u" 2>&1)"; rc=$?
+    if [ "$rc" -ne 0 ]; then echo "  web       : $u  ⚠ REQUEST FAILED (curl exit $rc): $res"
+    else
+      case "$res" in *powerconnection.com*) flag="✅";; 301*|302*|307*|308*) flag="↪ (not to powerconnection.com)";; *) flag="";; esac
+      echo "  web       : $u  $res $flag"
+    fi
+  done
 done

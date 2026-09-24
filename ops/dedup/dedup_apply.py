@@ -9,14 +9,17 @@ Safety:
 - Archive root must be on an external volume (/Volumes/...) unless --allow-internal.
 - Before each move, the file's sha256 is re-checked against the plan and the group's keeper must still exist.
 - action=flag-legal and action=keep rows are never touched.
-- Files under iCloud Drive are skipped unless --include-icloud: moving them off iCloud removes them from every device.
-- Writes MANIFEST.tsv and restore.sh (shell-quoted paths) into the run folder.
+- Files under iCloud Drive are skipped unless --include-icloud, and files in ~/Library/CloudStorage (Google Drive,
+  OneDrive, Dropbox, Box) unless --include-cloud-sync: moving them out of a synced folder deletes them from the cloud.
+- Writes MANIFEST.tsv and restore.sh (shell-quoted paths) into the run folder, one line per completed move, flushed
+  as it goes. A move that fails is reported and skipped; the rest of the run continues.
 """
 import argparse, csv, datetime, hashlib, os, shlex, shutil, sys
 from collections import defaultdict
 from pathlib import Path
 
 ICLOUD = "/Library/Mobile Documents/"
+CLOUD_SYNC = "/Library/CloudStorage/"
 
 
 def sha256(path):
@@ -34,6 +37,7 @@ def main():
     ap.add_argument("--apply", action="store_true")
     ap.add_argument("--allow-internal", action="store_true")
     ap.add_argument("--include-icloud", action="store_true")
+    ap.add_argument("--include-cloud-sync", action="store_true", help="also move files inside ~/Library/CloudStorage")
     a = ap.parse_args()
 
     root = a.archive_root.expanduser().resolve()
@@ -55,40 +59,54 @@ def main():
         restore = open(run / "restore.sh", "w")
         restore.write("#!/bin/bash\n# Undo dedup_apply run\nset -e\n")
     reasons = defaultdict(int)
-    for r in rows:
-        if r["action"] != "archive":
-            continue
-        src = r["path"]
-        why = None
-        if ICLOUD in src and not a.include_icloud:
-            why = "icloud (needs --include-icloud)"
-        elif not os.path.isfile(src):
-            why = "missing"
-        elif not os.path.isfile(keepers.get(r["group"], "")):
-            why = "keeper missing"
-        if why:
-            reasons[why] += 1
-            skipped += 1
-            continue
-        dst = run / src.lstrip("/")
-        print(f"{'move' if a.apply else 'would move'}  {src}  →  {dst}")
-        total += int(r["size"])
-        if not a.apply:
-            continue
-        if sha256(src) != r["sha256"] or sha256(keepers[r["group"]]) != r["sha256"]:
-            reasons["changed since scan"] += 1
-            skipped += 1
-            continue
-        dst.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(src, dst)
-        manifest.write(f"{r['group']}\t{r['sha256']}\t{r['size']}\t{src}\t{dst}\n")
-        restore.write(f"mkdir -p {shlex.quote(os.path.dirname(src))} && mv {shlex.quote(str(dst))} {shlex.quote(src)}\n")
-        moved += 1
-    if a.apply:
-        manifest.close(); restore.close(); os.chmod(run / "restore.sh", 0o755)
+    try:
+        for r in (r for r in rows if r["action"] == "archive"):
+            m, why = archive_one(r, keepers, run, a)
+            if why:
+                reasons[why] += 1
+                skipped += 1
+                continue
+            total += int(r["size"])
+            if m:
+                src, dst = m
+                manifest.write(f"{r['group']}\t{r['sha256']}\t{r['size']}\t{src}\t{dst}\n")
+                restore.write(f"mkdir -p {shlex.quote(os.path.dirname(src))} && mv {shlex.quote(str(dst))} {shlex.quote(src)}\n")
+                manifest.flush(); restore.flush()
+                moved += 1
+    finally:
+        if a.apply:
+            manifest.close(); restore.close(); os.chmod(run / "restore.sh", 0o755)
     print(f"\n{'moved' if a.apply else 'would move'}: {moved if a.apply else sum(1 for r in rows if r['action']=='archive') - skipped} files "
           f"({total / 1e9:.2f} GB) · skipped: {skipped} {dict(reasons) if reasons else ''}")
     print(f"Undo: bash {shlex.quote(str(run / 'restore.sh'))}" if a.apply else "Dry run. Re-run with --apply after approval.")
+
+
+def archive_one(r, keepers, run, a):
+    """Returns ((src, dst) or None, skip reason or None). Never raises for a single file's problem."""
+    src = r["path"]
+    if ICLOUD in src and not a.include_icloud:
+        return None, "icloud (needs --include-icloud)"
+    if CLOUD_SYNC in src and not a.include_cloud_sync:
+        return None, "cloud-sync folder (needs --include-cloud-sync)"
+    if not os.path.isfile(src):
+        return None, "missing"
+    if not os.path.isfile(keepers.get(r["group"], "")):
+        return None, "keeper missing"
+    dst = run / src.lstrip("/")
+    print(f"{'move' if a.apply else 'would move'}  {src}  →  {dst}")
+    if not a.apply:
+        return None, None
+    try:
+        if sha256(src) != r["sha256"] or sha256(keepers[r["group"]]) != r["sha256"]:
+            return None, "changed since scan"
+        dst.parent.mkdir(parents=True, exist_ok=True)
+        shutil.move(src, dst)
+    except OSError as e:
+        print(f"  ✗ could not move {src}: {e}", file=sys.stderr)
+        if os.path.isfile(src) and dst.exists():  # partial copy across volumes: original is intact, drop the fragment
+            dst.unlink()
+        return None, "error"
+    return (src, dst), None
 
 
 if __name__ == "__main__":

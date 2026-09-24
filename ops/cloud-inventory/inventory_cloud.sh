@@ -10,6 +10,7 @@
 # macOS bash 3.2 OK.
 
 set -u
+umask 077  # reports list accounts, vaults and history: readable by this user only
 OUT="${OUT:-$HOME/cloud-inventory-$(date +%Y%m%d-%H%M%S).md}"
 out() { printf '%s\n' "$*" >> "$OUT"; }
 run() { out '```'; "$@" >> "$OUT" 2>&1 || out "(failed: $*)"; out '```'; out ""; }
@@ -29,7 +30,7 @@ if have az; then
   out "Enterprise apps (SSO-connected services):"
   run az ad sp list --all --filter "tags/any(t:t eq 'WindowsAzureActiveDirectoryIntegratedApp')" --query '[].{app:displayName, created:createdDateTime}' -o table
   out "App registrations (check for stale client secrets):"
-  run az ad app list --all --query '[].{app:displayName, secrets:length(passwordCredentials), secretExpiry:passwordCredentials[0].endDateTime}' -o table
+  run az ad app list --all --query '[].{app:displayName, secrets:length(passwordCredentials), secretExpiries:join(`", "`, passwordCredentials[?endDateTime].endDateTime)}' -o table
 fi
 
 out "## L1 · Azure"

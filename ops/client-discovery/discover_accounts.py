@@ -3,7 +3,11 @@
 1Password item *titles/domains* (never secrets), Obsidian vault registry, macOS Internet Accounts and the Apple Mail index
 (all mail accounts in Mail.app, e.g. iCloud, Gmail, Exchange). READ-ONLY; metadata only.
 
-    python3 discover_accounts.py --out <dir>            # used by run_discovery.sh
+    python3 discover_accounts.py --out <dir>                                   # Obsidian registry only
+    python3 discover_accounts.py --out <dir> --consent-4b                      # + browsers, bookmarks, 1Password titles
+    python3 discover_accounts.py --out <dir> --consent-4b --mail-accounts a@x.com,b@y.com   # + those Mail accounts
+Browsers, bookmarks, 1Password and Apple Mail are T-02 clause 4b sources: they are read only with --consent-4b.
+Mail and Internet Accounts are further limited to the accounts listed in Schedule A (--mail-accounts; "all" = every account).
 
 Writes to <dir>:
   platforms-detected.csv    platform, layer, evidence source, visit count, last seen, tenants/workspaces seen
@@ -66,9 +70,19 @@ TENANT_PATTERNS = [
     (re.compile(r"^([\w-]+)\.1password\.com$"), "1Password"), (re.compile(r"^([\w-]+)\.vercel\.app$"), "Vercel deployments"),
     (re.compile(r"^([\w-]+)\.my\.salesforce\.com$"), "Salesforce"), (re.compile(r"^([\w-]+)\.cloud\.databricks\.com$"), "Databricks"),
 ]
-AI_PROJECT = re.compile(
-    r"(claude\.ai/project/|chatgpt\.com/g/|chatgpt\.com/gpts|chatgpt\.com/project|perplexity\.ai/(spaces|collections|page)/|"
-    r"gemini\.google\.com/gem/|notebooklm\.google\.com/notebook/|grok\.com/project|aistudio\.google\.com/prompts/|copilotstudio\.microsoft\.com)")
+# host → path prefixes that identify an AI project, GPT, Space, Gem or notebook
+AI_PROJECT_PATHS = {
+    "claude.ai": ("/project/",), "chatgpt.com": ("/g/", "/gpts", "/project"), "perplexity.ai": ("/spaces/", "/collections/", "/page/"),
+    "gemini.google.com": ("/gem/",), "notebooklm.google.com": ("/notebook/",), "grok.com": ("/project",),
+    "aistudio.google.com": ("/prompts/",), "copilotstudio.microsoft.com": ("/",),
+}
+
+
+def is_ai_project(url):
+    u = urlparse(url or "")
+    host = (u.hostname or "").lower()
+    host = host[4:] if host.startswith("www.") else host
+    return u.scheme in ("http", "https") and any(u.path.startswith(p) for p in AI_PROJECT_PATHS.get(host, ()))
 
 CHROMIUM = {
     "Chrome": HOME / "Library/Application Support/Google/Chrome",
@@ -178,8 +192,12 @@ def mail_accounts_map():
     return out
 
 
-def apple_mail(hit):
-    """Metadata from Mail.app's Envelope Index: accounts, platform senders, alert subjects."""
+def in_scope(user, allowed):
+    return allowed is None or (user or "").lower() in allowed
+
+
+def apple_mail(hit, allowed):
+    """Metadata from Mail.app's Envelope Index: accounts, platform senders, alert subjects. allowed=None means all accounts."""
     idx = sorted(glob.glob(str(HOME / "Library/Mail/V*/MailData/Envelope Index")),
                  key=lambda p: int(re.search(r"/V(\d+)/", p).group(1)) if re.search(r"/V(\d+)/", p) else 0)
     accounts = mail_accounts_map()
@@ -193,6 +211,8 @@ def apple_mail(hit):
     for url, sender, subject, received in read_sqlite(idx[-1], q):
         acct_id = urlparse(url or "").netloc
         user = accounts.get(acct_id, (acct_id, ""))[0] or acct_id
+        if not in_scope(user, allowed):
+            continue
         ts = datetime.datetime.fromtimestamp(received or 0)
         r = acct_rows.setdefault(user, {"messages": 0, "last": ts, "type": accounts.get(acct_id, ("", ""))[1]})
         r["messages"] += 1
@@ -210,8 +230,14 @@ def apple_mail(hit):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
+    ap.add_argument("--consent-4b", action="store_true", help="T-02 clause 4b is ticked: read browsers, bookmarks, 1Password titles, Mail")
+    ap.add_argument("--mail-accounts", default="", help='comma-separated Schedule A mail accounts, or "all"; empty = skip Mail')
     a = ap.parse_args()
+    os.umask(0o077)
     a.out.mkdir(parents=True, exist_ok=True)
+    mail_allowed = None if a.mail_accounts.strip().lower() == "all" else {m.strip().lower() for m in a.mail_accounts.split(",") if m.strip()}
+    if not a.consent_4b:
+        print("  clause 4b not consented: skipping browsers, bookmarks, 1Password and Apple Mail")
 
     plat = defaultdict(lambda: {"layer": "", "sources": set(), "visits": 0, "last": None, "tenants": set()})
     projects = {}
@@ -226,7 +252,7 @@ def main():
         if tenant:
             p["tenants"].add(tenant)
 
-    for browser, url, title, cnt, ts in history_rows():
+    for browser, url, title, cnt, ts in (history_rows() if a.consent_4b else ()):
         host = urlparse(url).hostname
         c = classify(host)
         t = tenant_of(host)
@@ -234,13 +260,13 @@ def main():
             hit(c[0], c[1], browser.split(":")[0] + " history", cnt, ts, t[1] if t else None)
         elif t:
             hit(t[0], "L5-saas", browser.split(":")[0] + " history", cnt, ts, t[1])
-        if AI_PROJECT.search(url or ""):
+        if is_ai_project(url):
             key = url.split("?")[0]
             if key not in projects or ts > projects[key][3]:
                 projects[key] = (classify(host)[0] if classify(host) else host, title or "", browser, ts)
 
     bm_lines, n_bm = defaultdict(list), 0
-    for browser, folder, title, url in bookmark_rows():
+    for browser, folder, title, url in (bookmark_rows() if a.consent_4b else ()):
         host = urlparse(url).hostname or ""
         n_bm += 1
         bm_lines[f"{browser} · {folder or '(root)'}"].append(f"- {title or host} — `{host}`")
@@ -250,7 +276,7 @@ def main():
 
     # 1Password: titles + domains only
     op_rows = []
-    if shutil.which("op"):
+    if a.consent_4b and shutil.which("op"):
         try:
             items = json.loads(subprocess.run(["op", "item", "list", "--format", "json"], capture_output=True, text=True, timeout=120).stdout or "[]")
             for it in items:
@@ -263,7 +289,11 @@ def main():
         except Exception as e:
             print(f"  skip 1Password: {e} (sign in with `op signin`)")
 
-    mail_rows, mail_alerts, sys_accounts = apple_mail(hit)
+    mail_rows, mail_alerts, sys_accounts = {}, [], {}
+    if a.consent_4b and (mail_allowed is None or mail_allowed):
+        mail_rows, mail_alerts, sys_accounts = apple_mail(hit, mail_allowed)
+    elif a.consent_4b:
+        print("  Apple Mail: no --mail-accounts given (Schedule A), skipped")
 
     # Obsidian vault registry
     obs = HOME / "Library/Application Support/obsidian/obsidian.json"
@@ -307,7 +337,7 @@ def main():
         for user, r in sorted(mail_rows.items()):
             w.writerow(["Apple Mail", user, r["type"], r["messages"], r["last"].strftime("%Y-%m-%d")])
         for user, typ in sorted(set(sys_accounts.values())):
-            if user:
+            if user and in_scope(user, mail_allowed):
                 w.writerow(["macOS Internet Accounts", user, typ, "", ""])
     with open(a.out / "mail-alerts.csv", "w", newline="") as f:
         w = csv.writer(f)

@@ -50,6 +50,8 @@ The standard is that of a CTO doing technical due diligence on an acquisition.
 
 ### 2. Discovery (read-only)
 - ☐ Run `bash ops/client-discovery/run_discovery.sh <client-slug>` on each Mac. It bundles the Mac, dev, AI-tool and cloud audits.
+  Browsers, 1Password and Apple Mail are read only if T-02 clause 4b is ticked: then prefix `CONSENT_4B=1 MAIL_ACCOUNTS="<Schedule A mail accounts>"`.
+  A `DISCOVERY-INCOMPLETE.txt` in the bundle lists any step that failed.
 - ☐ Run connector inventories from a cloud session: Drive, OneDrive/SharePoint, Notion, GitHub (all orgs), mailboxes (metadata only).
 - ☐ Request exports the client must trigger themselves (see `ops/ai-library/README.md`): ChatGPT, Claude, Grok, Perplexity, Google Takeout, Microsoft Purview.
 - ☐ Work through **SOP-02** section by section. Mark each item ✅ evidence · ⚠️ finding · ❓ gap (with the reason).

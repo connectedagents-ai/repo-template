@@ -3,6 +3,10 @@
 # Bundles every audit into ~/client-discovery/<client>-<date>/ and pre-fills the platform register (T-03).
 #
 #   bash ops/client-discovery/run_discovery.sh <client-slug>
+#   CONSENT_4B=1 MAIL_ACCOUNTS="me@icloud.com,me@work.com" bash ops/client-discovery/run_discovery.sh <client-slug>
+#
+# Browsers, bookmarks, 1Password and Apple Mail are read only when T-02 clause 4b is ticked (CONSENT_4B=1), and Mail
+# only for the Schedule A accounts in MAIL_ACCOUNTS (comma-separated, or "all").
 #
 # Collects metadata only (names, sizes, dates, versions, account names). Never secret values, never file contents.
 # Browser history is reduced to known-platform domains + AI project URLs; full history and search terms are not exported.
@@ -10,6 +14,7 @@
 # macOS bash 3.2 OK.
 
 set -u
+umask 077  # reports list accounts, vaults and history: readable by this user only
 CLIENT="${1:?usage: run_discovery.sh <client-slug>}"
 case "$CLIENT" in *[!A-Za-z0-9._-]*|.*|"") echo "client slug must use only letters, digits, . _ - (got: $CLIENT)" >&2; exit 2;; esac
 HERE="$(cd "$(dirname "$0")" && pwd)"
@@ -25,6 +30,10 @@ csvq() { printf '"%s"' "$(printf '%s' "$1" | sed 's/"/""/g')"; }
 reg() { n=$(wc -l < "$REG" | tr -d ' ')
   printf 'P-%03d,%s,%s,%s,,,Detected,,,,,,,%s,Decide,,,\n' "$n" "$(csvq "$1")" "$(csvq "$2")" "$(csvq "$3")" "$(csvq "$4")" >> "$REG"; }
 step() { printf '\n== %s\n' "$*" | tee -a "$LOG"; }
+INCOMPLETE="$OUTDIR/DISCOVERY-INCOMPLETE.txt"
+incomplete() { echo "  ✗ $1 failed; see run.log" | tee -a "$LOG"; echo "$1 FAILED: $2" >> "$INCOMPLETE"; }
+CONSENT_4B="${CONSENT_4B:-0}"
+MAIL_ACCOUNTS="${MAIL_ACCOUNTS:-}"
 
 step "1/7 Endpoint (SOP-02 §I)"
 EP="$OUTDIR/endpoint.md"
@@ -81,7 +90,7 @@ done
 command -v gh >/dev/null && gh auth status 2>&1 | awk '/Logged in to/ {for(i=1;i<=NF;i++) if($i=="account") print $(i+1)}' | while read -r a; do reg L3-code GitHub "$a" "gh auth status"; done
 command -v az >/dev/null && az account show --query user.name -o tsv 2>/dev/null | while read -r a; do reg L0-identity "Microsoft Entra ID / Azure" "$a" "az account show"; done
 command -v gcloud >/dev/null && gcloud auth list --format='value(account)' 2>/dev/null | while read -r a; do reg L1-cloud "Google Cloud" "$a" "gcloud auth list"; done
-command -v op >/dev/null && op account list --format=json 2>/dev/null | python3 -c 'import json,sys; [print(a.get("url","")+" "+a.get("email","")) for a in json.load(sys.stdin)]' 2>/dev/null | while read -r a; do reg L0-secrets 1Password "$a" "op account list"; done
+[ "$CONSENT_4B" = 1 ] && command -v op >/dev/null && op account list --format=json 2>/dev/null | python3 -c 'import json,sys; [print(a.get("url","")+" "+a.get("email","")) for a in json.load(sys.stdin)]' 2>/dev/null | while read -r a; do reg L0-secrets 1Password "$a" "op account list"; done
 command -v vercel >/dev/null && vercel whoami 2>/dev/null | tail -1 | while read -r a; do reg L4-runtime Vercel "$a" "vercel whoami"; done
 # AI tool config dirs
 for pair in ".claude:Claude Code" ".codex:OpenAI Codex CLI" ".cursor:Cursor" ".gemini:Gemini CLI / Antigravity" ".grok:Grok CLI" ".continue:Continue" ".aider.conf.yml:Aider"; do
@@ -90,29 +99,40 @@ done
 echo "  → $REG ($(($(wc -l < "$REG") - 1)) rows)"
 
 step "3/7 Browsers (Chrome, Edge, Safari, Brave, Arc, Comet), bookmarks, Apple Mail + Internet Accounts, 1Password titles, Obsidian vaults"
-python3 "$HERE/discover_accounts.py" --out "$OUTDIR" 2>>"$LOG" | tee -a "$LOG"
+DISC_ARGS=""
+[ "$CONSENT_4B" = 1 ] && DISC_ARGS="--consent-4b" || echo "  T-02 clause 4b not consented (CONSENT_4B=1): browsers, 1Password and Mail are skipped" | tee -a "$LOG"
+python3 "$HERE/discover_accounts.py" --out "$OUTDIR" $DISC_ARGS --mail-accounts "$MAIL_ACCOUNTS" 2>>"$LOG" | tee -a "$LOG"
 if [ "${PIPESTATUS[0]}" -ne 0 ]; then
-  echo "  ✗ account discovery failed; see run.log (browser/Mail/1Password outputs are missing or partial)" | tee -a "$LOG"
-  echo "account discovery FAILED; outputs in this bundle may be missing" > "$OUTDIR/DISCOVERY-INCOMPLETE.txt"
+  incomplete "account discovery" "browser/Mail/1Password outputs are missing or partial"
 fi
 if [ -f "$OUTDIR/platforms-detected.csv" ]; then
-  # parse with a real CSV reader; hand bash tab-separated fields
-  python3 -c 'import csv,sys; [print("\t".join(r)) for r in list(csv.reader(open(sys.argv[1])))[1:]]' "$OUTDIR/platforms-detected.csv" |
-  while IFS="$(printf '\t')" read -r plat layer ev visits last tenants; do
+  # parse with a real CSV reader; hand bash unit-separator (0x1F) fields: unlike tab, empty fields don't collapse
+  python3 -c 'import csv,sys; [print("\x1f".join(r)) for r in list(csv.reader(open(sys.argv[1])))[1:]]' "$OUTDIR/platforms-detected.csv" |
+  while IFS="$(printf '\037')" read -r plat layer ev visits last tenants; do
     reg "$layer" "$plat" "$tenants" "$ev ($visits visits; last $last)"
   done
 fi
 
 step "4/7 Claude, dev files, AI workspaces, git repos (mac-cleanup audit)"
-REPORT="$OUTDIR/mac-audit.md" bash "$OPS/mac-cleanup/audit_claude_files.sh" >>"$LOG" 2>&1 && echo "  → $OUTDIR/mac-audit.md"
+if REPORT="$OUTDIR/mac-audit.md" bash "$OPS/mac-cleanup/audit_claude_files.sh" >>"$LOG" 2>&1; then
+  echo "  → $OUTDIR/mac-audit.md"
+else
+  incomplete "mac audit" "mac-audit.md is missing or partial"
+fi
 
 step "5/7 Rescue and cleanup previews (dry runs, nothing changes)"
-bash "$OPS/mac-cleanup/collect_ai_workspaces.sh" > "$OUTDIR/preview-collect-ai-workspaces.txt" 2>&1
-bash "$OPS/mac-cleanup/archive_claude_files.sh" --prune-mcp > "$OUTDIR/preview-archive-claude.txt" 2>&1
+bash "$OPS/mac-cleanup/collect_ai_workspaces.sh" > "$OUTDIR/preview-collect-ai-workspaces.txt" 2>&1 \
+  || incomplete "collect-ai-workspaces preview" "preview-collect-ai-workspaces.txt is partial"
+bash "$OPS/mac-cleanup/archive_claude_files.sh" --prune-mcp > "$OUTDIR/preview-archive-claude.txt" 2>&1 \
+  || incomplete "archive-claude preview" "preview-archive-claude.txt is partial"
 echo "  → preview-*.txt"
 
 step "6/7 Cloud stack (uses logged-in CLIs; skips the rest)"
-OUT="$OUTDIR/cloud-inventory.md" bash "$OPS/cloud-inventory/inventory_cloud.sh" >>"$LOG" 2>&1 && echo "  → $OUTDIR/cloud-inventory.md"
+if OUT="$OUTDIR/cloud-inventory.md" bash "$OPS/cloud-inventory/inventory_cloud.sh" >>"$LOG" 2>&1; then
+  echo "  → $OUTDIR/cloud-inventory.md"
+else
+  incomplete "cloud inventory" "cloud-inventory.md is missing or partial"
+fi
 
 step "7/7 Storage footprint (SOP-02 §G)"
 {
@@ -128,6 +148,8 @@ echo "  → $OUTDIR/storage.md"
 cat > "$OUTDIR/README.md" <<EOF
 # Discovery bundle: $CLIENT
 Generated $(date) on $(hostname). Read-only; metadata only.
+Clause 4b sources (browsers, 1Password, Mail): $( [ "$CONSENT_4B" = 1 ] && echo "read; Mail accounts: ${MAIL_ACCOUNTS:-none}" || echo "NOT read (no consent)")
+$( [ -f "$INCOMPLETE" ] && printf '\n**INCOMPLETE BUNDLE.** Failed steps:\n\n%s\n' "$(sed 's/^/- /' "$INCOMPLETE")")
 
 | File | What | SOP-02 sections |
 |---|---|---|

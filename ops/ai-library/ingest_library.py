@@ -13,8 +13,11 @@ Layout written under --library (default ~/Archive/ai-library-raw, a PRIVATE stor
     INDEX.md                         regenerated table of contents
 
 Copies only; never moves or deletes originals. Identical content (same sha256) is stored once.
-Secrets-looking files (.env, keys, credentials) are skipped.
-A ChatGPT export's conversations.json is also split into one Markdown file per conversation (sources/.../chats/).
+Secrets-looking files (.env, keys, credentials) and symlinks are skipped, also inside skill folders.
+A skill whose content is already in the library is recorded as a duplicate, not copied again.
+Every catalog entry keeps its provenance: one {source, account, origin} record per place it was found.
+A ChatGPT export's conversations.json (or conversations-NNN.json) is also split into one Markdown file per
+conversation (sources/.../chats/); re-ingesting a newer export updates each conversation's file in place.
 """
 import argparse, datetime, hashlib, json, os, re, shutil, subprocess, sys, tempfile, zipfile
 from pathlib import Path
@@ -27,6 +30,7 @@ KINDS = {
 }
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", ".next", "dist", "build", ".DS_Store"}
 SECRET = re.compile(r"(^\.env)|(\.pem$)|(\.p12$)|(^id_(rsa|ed25519))|credential|secret|password|token", re.I)
+CHATGPT_CONVERSATIONS = re.compile(r"conversations(-\d+)?\.json")
 
 
 def looks_secret(p: Path) -> bool:
@@ -67,10 +71,36 @@ def sha256(p: Path) -> str:
     return h.hexdigest()
 
 
+def skip_in_copy(p: Path) -> bool:
+    return p.name in SKIP_DIRS or p.is_symlink() or (p.is_file() and looks_secret(p))
+
+
+def skill_files(d: Path):
+    """Files a skill copy would contain, relative to d, in a stable order."""
+    out = []
+    for dirpath, dirnames, filenames in os.walk(d):
+        base = Path(dirpath)
+        dirnames[:] = sorted(x for x in dirnames if not skip_in_copy(base / x))
+        out += [base / f for f in sorted(filenames) if not skip_in_copy(base / f)]
+    return out
+
+
+def skill_hash(d: Path) -> str:
+    h = hashlib.sha256()
+    for f in skill_files(d):
+        h.update(f.relative_to(d).as_posix().encode() + b"\0" + sha256(f).encode() + b"\n")
+    return h.hexdigest()
+
+
+def add_origin(entry: dict, prov: dict):
+    if prov not in entry["origins"]:
+        entry["origins"].append(prov)
+
+
 def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
-    """ChatGPT export → one Markdown file per conversation. Other formats are left as raw JSON."""
+    """ChatGPT export → one Markdown file per conversation, named by conversation id. Other formats stay raw JSON."""
     try:
-        convs = json.loads(path.read_text())
+        convs = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
         return 0
     if not (isinstance(convs, list) and convs and isinstance(convs[0], dict) and "mapping" in convs[0]):
@@ -94,12 +124,10 @@ def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
         body += [f"**{r}:**\n\n{t}\n" for _, r, t in msgs]
         if apply:
             out.mkdir(parents=True, exist_ok=True)
-            ident = slug(str(c.get("id") or c.get("conversation_id") or n))[:12]
-            dest = out / f"{created}-{slug(title)[:80]}-{ident}.md"
-            k = 1
-            while dest.exists():
-                dest = dest.with_name(f"{dest.stem}-{k}.md"); k += 1
-            dest.write_text("\n".join(body))
+            ident = slug(str(c.get("id") or c.get("conversation_id") or f"{created}-{title}"))
+            for old in out.glob(f"*--{ident}.md"):  # same conversation from an earlier export: replace it
+                old.unlink()
+            (out / f"{created}-{slug(title)[:80]}--{ident}.md").write_text("\n".join(body), encoding="utf-8")
         n += 1
     return n
 
@@ -120,11 +148,16 @@ def ensure_room(dest: Path, need: int, min_free_gb: float):
 
 
 def tree_size(d: Path) -> int:
-    total = 0
-    for dirpath, dirnames, filenames in os.walk(d):
-        dirnames[:] = [x for x in dirnames if x not in SKIP_DIRS]
-        total += sum(os.path.getsize(os.path.join(dirpath, f)) for f in filenames if not f.startswith(".env"))
-    return total
+    return sum(f.stat().st_size for f in skill_files(d))
+
+
+def unpack_zip(inp: Path, tmp_parent: Path, min_free_gb: float) -> Path:
+    """Extract next to the library (not into the system temp dir), after checking the unpacked size fits."""
+    with zipfile.ZipFile(inp) as z:
+        ensure_room(tmp_parent, sum(i.file_size for i in z.infolist()), min_free_gb)
+        t = Path(tempfile.mkdtemp(prefix=".ingest-", dir=tmp_parent))
+        z.extractall(t)
+    return t
 
 
 def walk(root: Path):
@@ -155,55 +188,65 @@ def main():
         sys.exit(f"refusing: {lib} is inside a git work tree. Raw exports can hold PII, privileged material or credentials; "
                  "keep them in a private store and promote reviewed items by hand (or pass --allow-git for sanitized input).")
     catalog_path = lib / "catalog.json"
-    catalog = json.loads(catalog_path.read_text()) if catalog_path.exists() else {}
+    catalog = json.loads(catalog_path.read_text(encoding="utf-8")) if catalog_path.exists() else {}
     by_hash = {e["sha256"]: e for e in catalog.values()}
     today = datetime.date.today().isoformat()
     stats = {"new": 0, "duplicate": 0, "skipped-secret": 0, "skills": 0}
     tmpdirs = []
-
     roots = []
-    for inp in a.inputs:
-        inp = inp.expanduser()
-        if inp.suffix.lower() == ".zip":
-            t = Path(tempfile.mkdtemp()); tmpdirs.append(t)
-            zipfile.ZipFile(inp).extractall(t)
-            roots.append((t, inp))
-        elif inp.exists():
-            roots.append((inp, inp))
-        else:
-            print(f"missing: {inp}", file=sys.stderr)
-
     stopped = None
     try:
+        for inp in a.inputs:
+            inp = inp.expanduser()
+            if inp.suffix.lower() == ".zip":
+                t = unpack_zip(inp, probe, a.min_free_gb); tmpdirs.append(t)
+                roots.append((t, inp))
+            elif inp.exists():
+                roots.append((inp, inp))
+            else:
+                print(f"missing: {inp}", file=sys.stderr)
+
         for root, origin in roots:
             files = [root] if root.is_file() else None
             if files is None:
                 files = []
                 for d, dirnames, filenames in walk(root):
                     if "SKILL.md" in filenames and d != root.parent:
+                        dirnames[:] = []
+                        h = skill_hash(d)
+                        prov = {"source": a.source, "account": a.account, "origin": str(origin / d.relative_to(root))}
+                        if h in by_hash:
+                            stats["duplicate"] += 1
+                            add_origin(by_hash[h], prov)
+                            continue
                         dest = lib / "skills" / slug(d.name)
                         k = 1
                         while dest.exists():
                             dest = dest.with_name(f"{slug(d.name)}-{k}"); k += 1
                         print(f"skill      {d} → {dest.relative_to(lib)}")
                         stats["skills"] += 1
+                        entry = {"sha256": h, "path": str(dest.relative_to(lib)), "source": a.source, "account": a.account,
+                                 "kind": "skill", "title": d.name, "ingested": today, "bytes": tree_size(d), "origins": [prov]}
+                        by_hash[h] = entry
                         if a.apply:
-                            ensure_room(dest, tree_size(d), a.min_free_gb)
-                            shutil.copytree(d, dest, ignore=shutil.ignore_patterns(*SKIP_DIRS, ".env*"))
-                        dirnames[:] = []
+                            ensure_room(dest, entry["bytes"], a.min_free_gb)
+                            shutil.copytree(d, dest, ignore=lambda src, names: [n for n in names if skip_in_copy(Path(src) / n)])
+                            catalog[entry["path"]] = entry
                         continue
                     files += [d / f for f in filenames if f != ".DS_Store"]
             for f in files:
+                if f.is_symlink():
+                    continue
                 if looks_secret(f):
                     stats["skipped-secret"] += 1
                     print(f"skip-secret {f}")
                     continue
                 h = sha256(f)
                 orig = str(origin / f.relative_to(root)) if root.is_dir() else str(origin)
+                prov = {"source": a.source, "account": a.account, "origin": orig}
                 if h in by_hash:
                     stats["duplicate"] += 1
-                    if orig not in by_hash[h]["origins"]:
-                        by_hash[h]["origins"].append(orig)
+                    add_origin(by_hash[h], prov)
                     continue
                 k = kind_of(f)
                 dest = lib / "sources" / slug(a.source) / slug(a.account) / k / slug(f.name)
@@ -213,14 +256,14 @@ def main():
                 print(f"new        [{k:9}] {orig} → {dest.relative_to(lib)}")
                 stats["new"] += 1
                 entry = {"sha256": h, "path": str(dest.relative_to(lib)), "source": a.source, "account": a.account, "kind": k,
-                         "title": f.stem, "ingested": today, "bytes": f.stat().st_size, "origins": [orig]}
+                         "title": f.stem, "ingested": today, "bytes": f.stat().st_size, "origins": [prov]}
                 by_hash[h] = entry
                 if a.apply:
                     ensure_room(dest, f.stat().st_size, a.min_free_gb)
                     dest.parent.mkdir(parents=True, exist_ok=True)
                     shutil.copy2(f, dest)
                     catalog[entry["path"]] = entry
-                if f.name == "conversations.json":
+                if CHATGPT_CONVERSATIONS.fullmatch(f.name):
                     stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, lib / "sources" / slug(a.source) / slug(a.account) / "chats", a.apply)
 
     except NoRoom as e:  # keep the catalog consistent with what was already copied
@@ -228,13 +271,13 @@ def main():
 
     if a.apply:
         lib.mkdir(parents=True, exist_ok=True)
-        catalog_path.write_text(json.dumps(catalog, indent=2, sort_keys=True))
+        catalog_path.write_text(json.dumps(catalog, indent=2, sort_keys=True, ensure_ascii=False), encoding="utf-8")
         lines = ["# AI library index", "", f"_Regenerated {today} by ingest_library.py: {len(catalog)} files._", ""]
         skills = sorted(p.name for p in (lib / "skills").glob("*") if p.is_dir()) if (lib / "skills").exists() else []
         if skills:
             lines += ["## Skills", ""] + [f"- [`{s}`](skills/{s}/SKILL.md)" for s in skills] + [""]
         groups = {}
-        for e in catalog.values():
+        for e in (e for e in catalog.values() if e["kind"] != "skill"):
             groups.setdefault((e["source"], e.get("account", "default"), e["kind"]), []).append(e)
         for (src, acct, k), es in sorted(groups.items()):
             lines += [f"## {src} · {acct} · {k} ({len(es)})", ""]
@@ -245,7 +288,7 @@ def main():
             files = sorted(chats.glob("*.md"))
             lines += [f"## {src} · {acct} · chats ({len(files)})", ""]
             lines += [f"- [{f.stem}]({f.relative_to(lib).as_posix().replace(' ', '%20')})" for f in files] + [""]
-        (lib / "INDEX.md").write_text("\n".join(lines))
+        (lib / "INDEX.md").write_text("\n".join(lines), encoding="utf-8")
 
     for t in tmpdirs:
         shutil.rmtree(t, ignore_errors=True)

@@ -5,7 +5,7 @@ Do these once, in order. ☐ = a checkbox for you.
 ## 1. Org security (github.com/organizations/connectedagents-ai/settings)
 - ☐ **Authentication security:** require 2FA for all members.
 - ☐ **Code security → Global settings:** enable **Secret scanning** and **Push protection** for all repos, plus Dependabot alerts and security updates. Push protection would have blocked the committed `.env` in `agent-central-config`.
-- ☐ **Repository → Rulesets:** create an org ruleset *"protect main"* targeting all repos' default branch: require a PR, require status check `CI / secrets`, block force pushes and deletions. Add yourself as bypass actor for emergencies.
+- ☐ **Repository → Rulesets:** create an org ruleset *"protect main"* targeting all repos' default branch: require a PR, require status checks `CI / secrets` **and** `CI / check`, block force pushes and deletions. Add yourself as bypass actor for emergencies.
 - ☐ **Member privileges:** base permission *Read*. Only owners can create repos, so every new repo starts from the template.
 - ☐ **Repository → Repository transfers:** allow transfers in (needed for the migration), then turn this off again.
 - ☐ Create team `maintainers` (it's referenced by `CODEOWNERS`).

@@ -140,6 +140,10 @@ say ""
 
 say "6) Stray config copies outside their real homes"
 while IFS= read -r f; do
+  if git -C "$(dirname "$f")" ls-files --error-unmatch -- "$(basename "$f")" >/dev/null 2>&1; then
+    say "  keep (tracked in git): $f"
+    continue
+  fi
   archive "$f" "stray copy"
 done < <(find "$HOME" -maxdepth "$DEPTH" \
   \( -path "$HOME/Library" -o -path "$HOME/.Trash" -o -path "$HOME/.claude" -o -path "$HOME/Archive" -o -name node_modules -o -name .git -o -name .venv \) -prune -o \

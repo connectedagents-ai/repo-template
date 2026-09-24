@@ -11,14 +11,16 @@ ai-library/
 ├── templates/<domain>/              document, deck and spreadsheet templates
 ├── forms/<domain>/                  intake forms, questionnaires, checklists
 ├── packages/                        plugins + MCP servers (code)
-├── sources/<tool>/<account>/…       raw exports, filed by ingest_library.py (read-only archive)
-├── catalog.json                     sha256-keyed catalog: one entry per unique file, with every place it came from
-└── INDEX.md                         generated table of contents
+└── INDEX.md                         table of contents of the promoted material
 ```
 
-**Workflow:** export from each account → `ingest_library.py` files it under `sources/` (with duplicates removed) → promote the good
-material into `skills/`, `prompts/`, `templates/` or `forms/` → commit. Only promoted material is "the library". `sources/` is the
-archive it came from.
+Raw exports are **not** part of this repo. `ingest_library.py` files them into a **private raw store**
+(default `~/Archive/ai-library-raw/`, or an external drive), which has `sources/<tool>/<account>/…`, `catalog.json` and its own
+`INDEX.md`. The script refuses to write inside a git work tree unless you pass `--allow-git` for already-sanitized input.
+
+**Workflow:** export from each account → `ingest_library.py` files it into the private raw store (with duplicates removed) → **review**
+each item and copy only the reusable, sanitized pieces (no client data, secrets or privileged material) into this repo's `skills/`,
+`prompts/`, `templates/` or `forms/` → commit those. Only promoted material is "the library"; the raw store never gets committed.
 
 ```bash
 python3 ops/ai-library/ingest_library.py --source perplexity --account personal ~/Downloads/perplexity/   # dry run
