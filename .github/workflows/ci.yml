@@ -1,0 +1,26 @@
+name: CI
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Shell scripts parse
+        run: find . -name '*.sh' -not -path './.git/*' -print0 | xargs -0 -r -n1 bash -n
+      - name: Lint and test
+        run: |
+          if [ -f Makefile ] && grep -q '^lint:' Makefile; then make lint; fi
+          if [ -f Makefile ] && grep -q '^test:' Makefile; then make test; fi

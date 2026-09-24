@@ -1,0 +1,17 @@
+# Consolidation runbook
+
+Everything here is **dry-run by default**, copies or archives instead of deleting, and logs what it did. Run the steps in order.
+(After consolidation, move `ops/` into `agent-central-config` and delete it from the template.)
+
+| # | Step | Command / doc |
+|---|---|---|
+| 0 | **Rotate exposed secrets** and turn on push protection | `github-consolidation/MIGRATION-PLAN.md` step 0 · `../docs/GITHUB-SETUP.md` §1 |
+| 1 | Audit the Mac: Claude, Codex, Cursor, Antigravity/Gemini, Grok, Perplexity, ChatGPT and Copilot files, git repos, disk hogs | `bash mac-cleanup/audit_claude_files.sh` → read `~/claude-audit-*.md` |
+| 2 | Rescue agent scratch work into one inbox repo | `bash mac-cleanup/collect_ai_workspaces.sh` → `--apply` |
+| 3 | Archive beginner-era Claude clutter and install the lean Claude Desktop config | `bash mac-cleanup/archive_claude_files.sh` → `--apply --install-desktop-config mac-cleanup/templates/claude_desktop_config.json` (undo: `~/Archive/claude-legacy-*/restore.sh`) |
+| 4 | Reset global agent config | copy `mac-cleanup/templates/CLAUDE.md` + `settings.json` into `~/.claude/`. Configure the other CLIs per `../docs/GITHUB-SETUP.md` §4 |
+| 5 | Set up the GitHub org, apps and CLI | `../docs/GITHUB-SETUP.md` |
+| 6 | Move every other org or account into `connectedagents-ai` | `bash github-consolidation/migrate_to_connectedagents.sh Connected-Energy-AI` → `--apply` |
+| 7 | Collapse ~280 repos into ~10 | `github-consolidation/MIGRATION-PLAN.md` step 2 · `bash github-consolidation/merge_into_monorepo.sh --apply <target> <owner/src> <path>` → PR → archive the source |
+| 8 | Export Perplexity, ChatGPT/OpenAI, Grok/xAI, Copilot (3 accounts), Google (Gemini, NotebookLM, AI Studio), Antigravity, Claude → central library | `ai-library/README.md` · `python3 ai-library/ingest_library.py --source <tool> --account <label> <export>` |
+| 9 | Clean up cloud agents' leftover branches and PRs (Codex, Cursor, Devin, Claude) | `github-consolidation/MIGRATION-PLAN.md` step 3 |

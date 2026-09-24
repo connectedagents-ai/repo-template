@@ -1,0 +1,35 @@
+# secrets — never commit (keep .env.example)
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+*credentials*.json
+*.1pif
+
+# dependencies / build output
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.pyc
+dist/
+build/
+.next/
+.turbo/
+coverage/
+
+# OS / editor
+.DS_Store
+.idea/
+*.swp
+
+# local logs and agent scratch
+logs/
+*.log
+.claude/settings.local.json
+CLAUDE.local.md
