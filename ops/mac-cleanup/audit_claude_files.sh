@@ -256,7 +256,24 @@ out '```'
 [ -f "$HOME/.gemini/settings.json" ] && command -v python3 >/dev/null 2>&1 && \
   out "Gemini CLI settings.json MCP servers: $(python3 -c 'import json,sys;print(" ".join(json.load(open(sys.argv[1])).get("mcpServers",{})))' "$HOME/.gemini/settings.json" 2>/dev/null)"
 [ -d "$HOME/Library/CloudStorage" ] && out "Cloud drives mounted: $(ls "$HOME/Library/CloudStorage" 2>/dev/null | tr '\n' ' ')"
-[ -d "$HOME/.grok" ] && out "Grok CLI: $(size_of "$HOME/.grok")"
+if [ -d "$HOME/.grok" ]; then
+  out "Grok CLI: $(size_of "$HOME/.grok")"
+  for g in "$HOME"/.grok/*.json; do
+    [ -f "$g" ] || continue
+    command -v python3 >/dev/null 2>&1 && python3 - "$g" >> "$REPORT" <<'PYG'
+import json, sys
+p = sys.argv[1]
+try:
+    d = json.load(open(p))
+except Exception:
+    sys.exit()
+keys = [k for k in ("apiKey", "api_key", "xaiApiKey") if isinstance(d.get(k), str) and d[k] and not d[k].startswith("op://")]
+servers = list((d.get("mcpServers") or {}).keys())
+print(f"  {p.split('/')[-1]}: {len(servers)} MCP servers ({' '.join(servers)})" + (f"  ⚠ plain-text {', '.join(keys)}" if keys else ""))
+PYG
+  done
+fi
+[ -f "$HOME/.codex/config.toml" ] && out "Codex MCP server count: $(grep -cE '^\[mcp_servers\.[^].]+\]' "$HOME/.codex/config.toml")  (park the non-core ones: ops/mcp/park_mcp_servers.py)"
 for d in "$HOME/Library/Application Support/Perplexity" "$HOME/Library/Application Support/Comet" "$HOME/Library/Application Support/ChatGPT" "$HOME/Library/Application Support/com.openai.chat"; do
   [ -d "$d" ] && out "$(basename "$d") desktop app data: $(size_of "$d")"
 done

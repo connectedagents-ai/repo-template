@@ -76,6 +76,11 @@ out "## L0 · 1Password (names only, never values)"
 if have op; then
   run op account list
   run op vault list
+  out "Vault sharing (who can open each vault: look for bots and broad shares):"
+  for v in $(op vault list --format json 2>/dev/null | python3 -c 'import json,sys;[print(x["id"]) for x in json.load(sys.stdin)]' 2>/dev/null); do
+    out "### vault $(op vault get "$v" --format json 2>/dev/null | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("name"), "·", d.get("items", "?"), "items")' 2>/dev/null)"
+    run op vault user list "$v"
+  done
 fi
 
 echo "Inventory written: $OUT"

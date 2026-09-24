@@ -45,7 +45,7 @@ EP="$OUTDIR/endpoint.md"
   command -v uv >/dev/null && uv tool list 2>/dev/null
   echo '```'
   echo; echo "## Duplicate dev tool installs"; echo '```'
-  for t in claude node python3 git gh codex gemini cursor; do c="$(which -a "$t" 2>/dev/null | sort -u | wc -l | tr -d ' ')"; [ "$c" -gt 1 ] && { echo "$t ($c):"; which -a "$t" | sort -u | sed 's/^/  /'; }; done
+  for t in claude node python3 git gh codex gemini grok cursor op; do c="$(which -a "$t" 2>/dev/null | sort -u | wc -l | tr -d ' ')"; [ "$c" -gt 1 ] && { echo "$t ($c):"; which -a "$t" | sort -u | sed 's/^/  /'; }; done
   echo '```'
   echo; echo "## Login items / LaunchAgents (automations)"; echo '```'
   ls "$HOME/Library/LaunchAgents" /Library/LaunchAgents 2>/dev/null

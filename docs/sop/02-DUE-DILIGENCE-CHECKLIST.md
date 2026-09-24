@@ -93,6 +93,8 @@ Mark each item: ✅ verified (cite evidence) · ⚠️ finding (→ T-04) · ❓
 | H8 | Agent automations: scheduled tasks, launchd jobs, Routines, Zapier/Make/n8n | D, Q |
 | H9 | AI projects, GPTs, Spaces, Gems and notebooks found in browser history (`ai-projects.csv`), reconciled with the exports | D |
 | H10 | Microsoft 365 Copilot per tenant, plus Copilot Studio agents | K, A |
+| H11 | **AI agents' delegated access:** password-manager vaults shared with bot/agent accounts (item counts and which items), and OAuth/enterprise apps granted to AI tools (e.g. "Grok Business" apps on Outlook, Calendar, OneDrive, Teams): scopes, consent type, last use. Default: least privilege, and revoke what isn't needed | C (`op vault user list`), A (Entra → Enterprise apps) |
+| H12 | Every AI CLI's own config is in scope: Claude, Codex (`~/.codex/config.toml`), Grok CLI (`~/.grok/*.json`), Gemini, Cursor. Count MCP servers, find plain-text keys, find duplicate installs | D |
 
 ## I. Endpoints (each Mac)
 | # | Check | Tool |
