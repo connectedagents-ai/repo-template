@@ -5,6 +5,7 @@ Everything here is **dry-run by default**, copies or archives instead of deletin
 
 | # | Step | Command / doc |
 |---|---|---|
+| 0a | Inventory the cloud stack top-down (Entra → Azure → GCP → GitHub → Vercel → Cloudflare → 1Password), then decide D1–D6 | `bash cloud-inventory/inventory_cloud.sh` · `../docs/CLOUD-ARCHITECTURE.md` |
 | 0 | **Rotate exposed secrets** and turn on push protection | `github-consolidation/MIGRATION-PLAN.md` step 0 · `../docs/GITHUB-SETUP.md` §1 |
 | 1 | Audit the Mac: Claude, Codex, Cursor, Antigravity/Gemini, Grok, Perplexity, ChatGPT and Copilot files, git repos, disk hogs | `bash mac-cleanup/audit_claude_files.sh` → read `~/claude-audit-*.md` |
 | 2 | Rescue agent scratch work into one inbox repo | `bash mac-cleanup/collect_ai_workspaces.sh` → `--apply` |
