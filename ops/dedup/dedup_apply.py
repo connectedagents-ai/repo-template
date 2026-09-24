@@ -84,6 +84,10 @@ def main():
 def archive_one(r, keepers, run, a):
     """Returns ((src, dst) or None, skip reason or None). Never raises for a single file's problem."""
     src = r["path"]
+    if not src.startswith("/"):
+        return None, "cloud-account file (use cloud_apply.py)"
+    if not keepers.get(r["group"], "").startswith("/"):
+        return None, "keeper is in a cloud account"
     if ICLOUD in src and not a.include_icloud:
         return None, "icloud (needs --include-icloud)"
     if CLOUD_SYNC in src and not a.include_cloud_sync:

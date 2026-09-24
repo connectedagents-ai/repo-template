@@ -41,7 +41,8 @@ menu() {
    3) Check my domains (DNS, mail, where each one points, expiry)
    4) Audit Claude and other AI-tool files on this Mac
    5) Preview the Claude cleanup (what would be archived)
-   6) Preview the duplicate-file cleanup (Mac, cloud folders, iCloud, SSD)
+   6) Preview the duplicate-file cleanup (Mac, cloud folders, iCloud, SSD, and connected Google Drive / pCloud)
+   c) Connect Google Drive and/or pCloud for the duplicate check (one-time, read-only sign-in)
    7) Preview moving GitHub repos into connectedagents-ai
    8) Inventory the cloud stack (Microsoft/Azure, Google Cloud, GitHub, Vercel, Cloudflare, 1Password)
    9) Run 1, 2, 3, 4, 5, 7 and 8 in a row (about 5 minutes), then show where the reports are
@@ -62,6 +63,7 @@ do_choice() {
     5) say "Previewing the Claude cleanup (dry run: nothing moves)"
        run preview-claude-cleanup.txt bash "$OPS/mac-cleanup/archive_claude_files.sh" --prune-mcp ;;
     6) bash "$OPS/dedup/start_here.sh" ;;
+    c|C) bash "$OPS/dedup/connect_cloud.sh" ;;
     7) if ! has gh || ! gh auth status >/dev/null 2>&1; then warn "Needs the GitHub CLI signed in (choice 1 shows how)"; return; fi
        say "Previewing the GitHub move (dry run: nothing moves)"
        mkdir -p "$OUT"; (cd "$OUT" && run github-migration-preview.txt bash "$OPS/github-consolidation/migrate_to_connectedagents.sh" Connected-Energy-AI) ;;

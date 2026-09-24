@@ -50,8 +50,18 @@ printf '\n  Also scan the SSD itself, to find Mac files that are copies of SSD f
 case "$inc" in y|Y|yes|YES) SSD_ROOT="$SSD"; ok "The SSD will be scanned too (read-only). SSD copies are kept; Mac copies are the ones proposed for archive.";;
   *) SSD_ROOT=""; ok "Scanning the Mac, cloud folders and iCloud only.";; esac
 
+CLOUD_REMOTES=""
+if command -v rclone >/dev/null 2>&1 && [ -n "$(rclone listremotes 2>/dev/null)" ]; then
+  printf '\n  Also check these connected cloud accounts (Google Drive / pCloud)? Nothing is downloaded.\n'
+  rclone listremotes | sed 's/^/     /'
+  printf '  Include them? (y/n): '; read -r inc_cloud
+  case "$inc_cloud" in y|Y|yes|YES) CLOUD_REMOTES="$(rclone listremotes | tr '\n' ' ')"; ok "Cloud accounts included (listed through their APIs).";; esac
+else
+  ok "No Google Drive / pCloud accounts connected (optional: bash ops/dedup/connect_cloud.sh, then run this again)."
+fi
+
 say "3/5 Scanning (this can take a while — leave this window open)"
-SSD_ROOT="$SSD_ROOT" OUT="$SSD/dedup-runs" bash "$HERE/run_dedup.sh" || stop "The scan stopped with an error. Copy everything above and paste it into Claude."
+CLOUD_REMOTES="$CLOUD_REMOTES" SSD_ROOT="$SSD_ROOT" OUT="$SSD/dedup-runs" bash "$HERE/run_dedup.sh" || stop "The scan stopped with an error. Copy everything above and paste it into Claude."
 RUN="$(ls -td "$SSD"/dedup-runs/*/ 2>/dev/null | head -1)"; RUN="${RUN%/}"
 [ -f "$RUN/PLAN.md" ] || stop "No report was produced. Copy everything above and paste it into Claude."
 
@@ -62,6 +72,7 @@ ok "Opened the report folder in Finder: $RUN"
 
 say "5/5 Preview of what WOULD be archived (still nothing moves)"
 python3 "$HERE/dedup_apply.py" --plan "$RUN/duplicates.csv" --archive-root "$SSD/Dedup-Archive" | tail -15
+[ -n "$CLOUD_REMOTES" ] && { echo; echo "  Inside your cloud accounts:"; python3 "$HERE/cloud_apply.py" --plan "$RUN/duplicates.csv" | tail -8; }
 
 say "Done. Nothing was moved."
 echo "  Next: paste the PLAN.md summary above into Claude and decide together."
