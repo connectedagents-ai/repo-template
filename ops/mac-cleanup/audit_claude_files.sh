@@ -275,9 +275,13 @@ PYG
   done
 fi
 [ -f "$HOME/.codex/config.toml" ] && out "Codex MCP server count: $(grep -cE '^\[mcp_servers\.[^].]+\]' "$HOME/.codex/config.toml")  (park the non-core ones: ops/mcp/park_mcp_servers.py)"
-for d in "$HOME/Library/Application Support/Perplexity" "$HOME/Library/Application Support/Comet" "$HOME/Library/Application Support/ChatGPT" "$HOME/Library/Application Support/com.openai.chat"; do
+for d in "$HOME/Library/Application Support/Perplexity" "$HOME/Library/Application Support/Comet" "$HOME/Library/Application Support/ChatGPT" "$HOME/Library/Application Support/com.openai.chat" "$HOME/Library/Application Support/Grok"; do
   [ -d "$d" ] && out "$(basename "$d") desktop app data: $(size_of "$d")"
 done
+# sandboxed app data (Grok / xAI / ChatGPT desktop apps from the App Store live in Containers)
+while IFS= read -r d; do
+  out "$(basename "$d") app container: $(size_of "$d")"
+done < <(find "$HOME/Library/Containers" "$HOME/Library/Group Containers" -maxdepth 1 -type d \( -iname '*grok*' -o -iname '*x.ai*' -o -iname '*xai*' -o -iname '*openai*' -o -iname '*chatgpt*' \) 2>/dev/null)
 n="$(find "$HOME/Downloads" "$HOME/Desktop" "$HOME/Documents" -maxdepth 3 -type f \( -iname '*perplexity*' -o -iname '*chatgpt*' -o -iname '*grok*' -o -iname '*copilot*' -o -iname 'conversations.json' \) 2>/dev/null | wc -l | tr -d ' ')"
 out "Loose AI exports in Downloads/Desktop/Documents (name mentions perplexity/chatgpt/grok/copilot): $n files → ingest with ops/ai-library/ingest_library.py"
 for app in Cursor Antigravity Windsurf "Code"; do
