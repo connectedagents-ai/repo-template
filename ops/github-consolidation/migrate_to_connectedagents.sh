@@ -28,11 +28,15 @@ PLAN="migration-plan-$STAMP.csv"
 echo "source,name,target_name,action,archived,fork,visibility" > "$PLAN"
 
 # One call for the whole target inventory, so collisions are checked against reality.
-TARGET_NAMES="$(gh repo list "$TARGET" --limit 2000 --json name -q '.[].name' | tr 'A-Z' 'a-z')"
+# Abort if it can't be fetched: an empty list would make every repo look collision-free.
+TARGET_NAMES="$(gh repo list "$TARGET" --limit 2000 --json name -q '.[].name')" || { echo "could not list $TARGET repos (gh auth/network); aborting" >&2; exit 1; }
+[ -n "$TARGET_NAMES" ] || { echo "$TARGET returned no repos; refusing to continue without a collision check" >&2; exit 1; }
+TARGET_NAMES="$(printf '%s\n' "$TARGET_NAMES" | tr 'A-Z' 'a-z')"
 
 for SRC in "$@"; do
-  gh repo list "$SRC" --limit 2000 --json name,isArchived,isFork,visibility \
-    -q '.[] | [.name, .isArchived, .isFork, .visibility] | @tsv' |
+  SRC_REPOS="$(gh repo list "$SRC" --limit 2000 --json name,isArchived,isFork,visibility \
+    -q '.[] | [.name, .isArchived, .isFork, .visibility] | @tsv')" || { echo "could not list $SRC repos; skipping $SRC" >&2; continue; }
+  printf '%s\n' "$SRC_REPOS" | grep -v '^$' |
   while IFS="$(printf '\t')" read -r name archived fork vis; do
     lname="$(printf '%s' "$name" | tr 'A-Z' 'a-z')"
     action="transfer"

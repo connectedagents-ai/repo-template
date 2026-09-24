@@ -36,7 +36,7 @@ for spec in \
   [ -d "$parent" ] || continue
   for d in "$parent"/*/; do
     [ -d "$d" ] || continue; d="${d%/}"; name="$(basename "$d")"
-    if [ -d "$d/.git" ] && [ -n "$(git -C "$d" remote get-url origin 2>/dev/null)" ]; then
+    if [ -e "$d/.git" ] && [ -n "$(git -C "$d" remote 2>/dev/null | head -1)" ]; then   # repo or worktree with any remote
       printf 'push-it   %-12s %s  (git repo with remote: commit + push there, then migrate)\n' "$tool" "${d#$HOME/}"
       continue
     fi

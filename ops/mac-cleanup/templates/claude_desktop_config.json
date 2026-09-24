@@ -2,7 +2,7 @@
   "mcpServers": {
     "playwright": {
       "command": "/opt/homebrew/bin/npx",
-      "args": ["-y", "@playwright/mcp@latest"]
+      "args": ["-y", "@playwright/mcp@0.0.82"]
     }
   }
 }

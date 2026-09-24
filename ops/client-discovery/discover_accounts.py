@@ -180,7 +180,8 @@ def mail_accounts_map():
 
 def apple_mail(hit):
     """Metadata from Mail.app's Envelope Index: accounts, platform senders, alert subjects."""
-    idx = sorted(glob.glob(str(HOME / "Library/Mail/V*/MailData/Envelope Index")))
+    idx = sorted(glob.glob(str(HOME / "Library/Mail/V*/MailData/Envelope Index")),
+                 key=lambda p: int(re.search(r"/V(\d+)/", p).group(1)) if re.search(r"/V(\d+)/", p) else 0)
     accounts = mail_accounts_map()
     acct_rows, alerts = {}, []
     if not idx:

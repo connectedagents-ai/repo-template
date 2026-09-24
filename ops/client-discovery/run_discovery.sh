@@ -11,6 +11,7 @@
 
 set -u
 CLIENT="${1:?usage: run_discovery.sh <client-slug>}"
+case "$CLIENT" in *[!A-Za-z0-9._-]*|.*|"") echo "client slug must use only letters, digits, . _ - (got: $CLIENT)" >&2; exit 2;; esac
 HERE="$(cd "$(dirname "$0")" && pwd)"
 OPS="$(dirname "$HERE")"
 OUTDIR="${OUTDIR:-$HOME/client-discovery/$CLIENT-$(date +%Y%m%d-%H%M%S)}"
@@ -20,7 +21,9 @@ LOG="$OUTDIR/run.log"
 n=0
 echo "id,layer,platform,account_or_tenant,entity,owner,status,plan_or_sku,monthly_cost,sso,mfa,data_held,sensitivity,evidence,decision,target,wire_in_done,notes" > "$REG"
 # ID from the file's line count, so rows added inside piped while-loops (subshells) stay unique
-reg() { n=$(wc -l < "$REG" | tr -d ' '); printf 'P-%03d,%s,%s,%s,,,Detected,,,,,,,%s,Decide,,,\n' "$n" "$1" "$2" "$3" "$4" >> "$REG"; }
+csvq() { printf '"%s"' "$(printf '%s' "$1" | sed 's/"/""/g')"; }
+reg() { n=$(wc -l < "$REG" | tr -d ' ')
+  printf 'P-%03d,%s,%s,%s,,,Detected,,,,,,,%s,Decide,,,\n' "$n" "$(csvq "$1")" "$(csvq "$2")" "$(csvq "$3")" "$(csvq "$4")" >> "$REG"; }
 step() { printf '\n== %s\n' "$*" | tee -a "$LOG"; }
 
 step "1/7 Endpoint (SOP-02 §I)"
@@ -88,9 +91,15 @@ echo "  → $REG ($(($(wc -l < "$REG") - 1)) rows)"
 
 step "3/7 Browsers (Chrome, Edge, Safari, Brave, Arc, Comet), bookmarks, Apple Mail + Internet Accounts, 1Password titles, Obsidian vaults"
 python3 "$HERE/discover_accounts.py" --out "$OUTDIR" 2>>"$LOG" | tee -a "$LOG"
+if [ "${PIPESTATUS[0]}" -ne 0 ]; then
+  echo "  ✗ account discovery failed; see run.log (browser/Mail/1Password outputs are missing or partial)" | tee -a "$LOG"
+  echo "account discovery FAILED; outputs in this bundle may be missing" > "$OUTDIR/DISCOVERY-INCOMPLETE.txt"
+fi
 if [ -f "$OUTDIR/platforms-detected.csv" ]; then
-  tail -n +2 "$OUTDIR/platforms-detected.csv" | while IFS=, read -r plat layer ev visits last tenants; do
-    reg "$layer" "$plat" "$tenants" "$ev ($visits visits, last $last)"
+  # parse with a real CSV reader; hand bash tab-separated fields
+  python3 -c 'import csv,sys; [print("\t".join(r)) for r in list(csv.reader(open(sys.argv[1])))[1:]]' "$OUTDIR/platforms-detected.csv" |
+  while IFS="$(printf '\t')" read -r plat layer ev visits last tenants; do
+    reg "$layer" "$plat" "$tenants" "$ev ($visits visits; last $last)"
   done
 fi
 

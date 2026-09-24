@@ -61,7 +61,8 @@ The standard is that of a CTO doing technical due diligence on an acquisition.
 
 ### 4. Risk and findings
 - ☐ **T-04 findings register**, severity P0–P3. P0 = exposed secret, admin without MFA, sole copy of critical data, unknown admin, public data leak.
-- ☐ P0s are fixed during discovery, with the client's approval: rotate keys, enable MFA, back up sole copies.
+- ☐ P0s are **escalated to the client the same day**. Discovery itself stays read-only. The fixes (rotate keys, enable MFA, back up sole copies) run as a
+  separate, approved change batch with its own dry-run → apply record (Phase 6 rules), started immediately rather than waiting for Phase 6.
 - ☐ **T-06 discovery report** presented to the client (template).
 
 ### 5. Target design

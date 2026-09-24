@@ -6,7 +6,7 @@
     python3 ingest_library.py --source chatgpt --account team ~/Downloads/chatgpt-export.zip --apply   # zips are unpacked
     python3 ingest_library.py --source grok --account personal ~/Downloads/grok-export --apply
 
-Layout written under --library (default ~/Code/connectedagents-ai/ai-library):
+Layout written under --library (default ~/Archive/ai-library-raw, a PRIVATE store that is not a git repo):
     skills/<name>/                   any folder that contains SKILL.md (portable Agent Skills format)
     sources/<source>/<account>/<kind>/<file>   everything else, kind = docs | forms | templates | data | code | media | other
     catalog.json                     one entry per unique file (sha256), with every original path it came from
@@ -16,7 +16,7 @@ Copies only; never moves or deletes originals. Identical content (same sha256) i
 Secrets-looking files (.env, keys, credentials) are skipped.
 A ChatGPT export's conversations.json is also split into one Markdown file per conversation (sources/.../chats/).
 """
-import argparse, datetime, hashlib, json, os, re, shutil, sys, tempfile, zipfile
+import argparse, datetime, hashlib, json, os, re, shutil, subprocess, sys, tempfile, zipfile
 from pathlib import Path
 
 KINDS = {
@@ -81,7 +81,12 @@ def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
         body += [f"**{r}:**\n\n{t}\n" for _, r, t in msgs]
         if apply:
             out.mkdir(parents=True, exist_ok=True)
-            (out / f"{created}-{slug(title)[:80]}.md").write_text("\n".join(body))
+            ident = slug(str(c.get("id") or c.get("conversation_id") or n))[:12]
+            dest = out / f"{created}-{slug(title)[:80]}-{ident}.md"
+            k = 1
+            while dest.exists():
+                dest = dest.with_name(f"{dest.stem}-{k}.md"); k += 1
+            dest.write_text("\n".join(body))
         n += 1
     return n
 
@@ -97,11 +102,21 @@ def main():
     ap.add_argument("inputs", nargs="+", type=Path)
     ap.add_argument("--source", required=True, help="perplexity | perplexity-computer | chatgpt | openai-platform | grok | xai-console | claude | codex | cursor | copilot | devin | antigravity | other")
     ap.add_argument("--account", default="default", help="which login this export came from, e.g. personal | team | teams | enterprise | api | work-email")
-    ap.add_argument("--library", type=Path, default=Path.home() / "Code/connectedagents-ai/ai-library")
+    ap.add_argument("--library", type=Path, default=Path.home() / "Archive/ai-library-raw",
+                    help="raw export store: private, NOT a git repo. Promote reviewed items into the ai-library repo by hand")
+    ap.add_argument("--allow-git", action="store_true", help="allow --library inside a git work tree (only for sanitized input)")
     ap.add_argument("--apply", action="store_true")
     a = ap.parse_args()
 
     lib = a.library.expanduser()
+    probe = lib if lib.exists() else lib.parent
+    while not probe.exists():
+        probe = probe.parent
+    in_git = subprocess.run(["git", "-C", str(probe), "rev-parse", "--is-inside-work-tree"],
+                            capture_output=True, text=True).stdout.strip() == "true"
+    if in_git and not a.allow_git:
+        sys.exit(f"refusing: {lib} is inside a git work tree. Raw exports can hold PII, privileged material or credentials; "
+                 "keep them in a private store and promote reviewed items by hand (or pass --allow-git for sanitized input).")
     catalog_path = lib / "catalog.json"
     catalog = json.loads(catalog_path.read_text()) if catalog_path.exists() else {}
     by_hash = {e["sha256"]: e for e in catalog.values()}
@@ -128,9 +143,12 @@ def main():
             for d, dirnames, filenames in walk(root):
                 if "SKILL.md" in filenames and d != root.parent:
                     dest = lib / "skills" / slug(d.name)
+                    k = 1
+                    while dest.exists():
+                        dest = dest.with_name(f"{slug(d.name)}-{k}"); k += 1
                     print(f"skill      {d} → {dest.relative_to(lib)}")
                     stats["skills"] += 1
-                    if a.apply and not dest.exists():
+                    if a.apply:
                         shutil.copytree(d, dest, ignore=shutil.ignore_patterns(*SKIP_DIRS, ".env*"))
                     dirnames[:] = []
                     continue

@@ -32,7 +32,7 @@ secrets/variables, webhooks, deploy keys and GitHub App installs** on the new si
 
 | Repo in both orgs | Recommended action |
 |---|---|
-| `onewish-os` | CEA copy is the most recently pushed (2026-09-24). Diff both copies, merge CEA's newer commits into `connectedagents-ai/onewish-os` (`merge_into_monorepo.sh … --as-branch`), then archive the CEA copy |
+| `onewish-os` | CEA copy is the most recently pushed (2026-09-24). Diff both copies, bring CEA's newer commits into `connectedagents-ai/onewish-os` on a branch (`git remote add cea https://github.com/Connected-Energy-AI/onewish-os && git fetch cea && git checkout -b chore/merge-cea cea/<branch>` → PR into `main`), then archive the CEA copy |
 | `repo-template`, `agent-central-config`, `gforce-repo-ops`, `connected-agents-ai`, `codex-platform`, `LitigationForce.AI`, `agent-skills-suite` | Compare the last commit dates. Keep the `connectedagents-ai` copy and cherry-pick anything newer from CEA. Archive the CEA copy |
 | `gemini-cli`, `github-mcp-server`, `railway-skills`, `agentskills`, `skills` (all unmodified upstream forks) | Keep **neither** unless you have commits on them. Delete or archive the forks and star the upstream instead |
 

@@ -157,9 +157,10 @@ out "|---|---|---|"
 TMP="$(mktemp)"; REMOTES="$(mktemp)"
 find "$HOME" -maxdepth "$DEPTH" \
   \( -path "$HOME/Library" -o -path "$HOME/.Trash" -o -name node_modules -o -name .venv -o -path "$HOME/Archive" \) -prune -o \
-  -type d -name .git -print 2>/dev/null | sed 's|/\.git$||' > "$TMP"
+  -name .git \( -type d -o -type f \) -print 2>/dev/null | sed 's|/\.git$||' > "$TMP"
 while IFS= read -r r; do
-  url="$(git -C "$r" remote get-url origin 2>/dev/null)"
+  rem="$(git -C "$r" remote 2>/dev/null | head -1)"
+  url="$( [ -n "$rem" ] && git -C "$r" remote get-url "$rem" 2>/dev/null)"
   flags=""
   case "$r" in "$HOME/Desktop"*|"$HOME/Downloads"*|"$HOME/Documents"*|*"Mobile Documents"*) flags="$flags ⚠️loc";; esac
   if [ -z "$url" ]; then flags="$flags 🚫"
@@ -202,8 +203,9 @@ out "| Tool | Folder | Last change | Git |"
 out "|---|---|---|---|"
 git_state() {
   d="$1"
-  if [ ! -d "$d/.git" ]; then printf '🚫git'; return; fi
-  u="$(git -C "$d" remote get-url origin 2>/dev/null)"; s=""
+  if [ ! -e "$d/.git" ]; then printf '🚫git'; return; fi   # .git is a dir, or a file for worktrees
+  r="$(git -C "$d" remote 2>/dev/null | head -1)"
+  u="$( [ -n "$r" ] && git -C "$d" remote get-url "$r" 2>/dev/null)"; s=""
   [ -z "$u" ] && s="$s no-remote"
   case "$u" in ""|*"${CANON_ORG:-connectedagents-ai}/"*) ;; *) s="$s ⚠️org";; esac
   [ -n "$(git -C "$d" status --porcelain 2>/dev/null | head -1)" ] && s="$s ✏️"

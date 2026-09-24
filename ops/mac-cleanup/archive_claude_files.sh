@@ -79,7 +79,7 @@ archive() {
   mkdir -p "$(dirname "$dst")"
   mv "$src" "$dst"
   printf 'move\t%s\t%s\n' "$src" "$dst" >> "$MANIFEST"
-  printf 'mkdir -p "%s" && mv "%s" "%s"\n' "$(dirname "$src")" "$dst" "$src" >> "$RESTORE"
+  printf 'mkdir -p %q && mv %q %q\n' "$(dirname "$src")" "$dst" "$src" >> "$RESTORE"
 }
 
 say "1) Snapshot live config (copied, left in place)"
@@ -141,7 +141,7 @@ if [ -n "$NEW_DESKTOP_CFG" ]; then
   fi
   say "  install   $NEW_DESKTOP_CFG → $DESKTOP_CFG (old copy is in the snapshot)"
   if [ "$APPLY" = 1 ]; then
-    [ -f "$DESKTOP_CFG" ] && printf 'cp "%s" "%s"\n' "$DEST/snapshot/${DESKTOP_CFG#$HOME/}" "$DESKTOP_CFG" >> "$RESTORE"
+    [ -f "$DESKTOP_CFG" ] && printf 'cp %q %q\n' "$DEST/snapshot/${DESKTOP_CFG#$HOME/}" "$DESKTOP_CFG" >> "$RESTORE"
     mkdir -p "$DESKTOP_DIR"
     cp "$NEW_DESKTOP_CFG" "$DESKTOP_CFG"
     printf 'install\t%s\t%s\n' "$NEW_DESKTOP_CFG" "$DESKTOP_CFG" >> "$MANIFEST"
@@ -172,7 +172,7 @@ for name in list(servers):
 if os.environ["APPLY"] == "1":
     json.dump(cfg, open(path, "w"), indent=2)
 PYEOF
-    [ "$APPLY" = 1 ] && printf 'cp "%s" "%s"\n' "$DEST/snapshot/${DESKTOP_CFG#$HOME/}" "$DESKTOP_CFG" >> "$RESTORE"
+    [ "$APPLY" = 1 ] && printf 'cp %q %q\n' "$DEST/snapshot/${DESKTOP_CFG#$HOME/}" "$DESKTOP_CFG" >> "$RESTORE"
   fi
   say "  Extension-managed servers can't be removed here. In Claude Desktop → Settings → Extensions, remove:"
   say "    Control Chrome (use the built-in Claude in Chrome instead) · Read and Send iMessages (unless you use it)"
