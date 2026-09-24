@@ -1,4 +1,4 @@
-import subprocess
+import importlib.util, subprocess
 from tests.helpers import OPS, TempDirTest
 
 FIND = OPS / "secrets/find_plaintext_keys.py"
@@ -35,6 +35,16 @@ class FindPlaintextKeysTest(TempDirTest):
         self.assertIn("//registry.npmjs.org/:_authToken", r.stdout)
         self.assertIn("npmjs.com/settings", r.stdout)
         self.assertNotIn("npm.pkg.github.com", r.stdout)
+
+    def test_rotate_links_go_to_the_right_provider(self):
+        spec = importlib.util.spec_from_file_location("fpk", FIND)
+        fpk = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(fpk)
+        self.assertIn("twilio", fpk.rotate_url("TWILIO_AUTH_TOKEN"))
+        self.assertIn("supabase", fpk.rotate_url("SUPABASE_DB_PASSWORD"))
+        self.assertIn("npmjs", fpk.rotate_url("//registry.npmjs.org/:_authToken"))
+        self.assertIn("npmjs", fpk.rotate_url("NPM_TOKEN"))
+        self.assertIn("github", fpk.rotate_url("//npm.pkg.github.com/:_authToken"))
 
     def test_committed_key_is_flagged_and_exits_nonzero(self):
         repo = self.tmp / "repo"

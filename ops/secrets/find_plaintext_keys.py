@@ -33,7 +33,7 @@ ROTATE = [
     ("PERPLEXITY|PPLX", "https://www.perplexity.ai/settings/api"),
     ("NOTION", "https://www.notion.so/profile/integrations"),
     ("OPENROUTER", "https://openrouter.ai/settings/keys"),
-    ("_authToken|_auth|_password|NPM", "https://www.npmjs.com/settings/~/tokens"),
+    (r"^//[^:]*npmjs\.org/?:_|\bNPM_", "https://www.npmjs.com/settings/~/tokens"),
     ("SUPABASE", "https://supabase.com/dashboard/account/tokens"),
     ("TWILIO", "https://console.twilio.com"),
 ]
