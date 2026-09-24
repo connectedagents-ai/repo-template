@@ -98,3 +98,41 @@ class CloudDedupTest(TempDirTest):
         (restore,) = self.tmp.glob("cloud-dedup-*/restore.sh")
         self.assertIn("rclone moveto", restore.read_text())
         subprocess.run(["bash", "-n", str(restore)], check=True)
+
+
+class QuickXorHashTest(TempDirTest):
+    """Reference values produced by `rclone hashsum quickxor` (rclone v1.71.1)."""
+
+    def setUp(self):
+        super().setUp()
+        import sys
+        sys.path.insert(0, str(OPS / "dedup"))
+        from quickxorhash import QuickXorHash
+        self.Q = QuickXorHash
+
+    def test_matches_rclone_reference_values_in_one_pass_and_in_pieces(self):
+        import random
+        rnd = random.Random(7)
+        big = bytes(rnd.getrandbits(8) for _ in range(100000))
+        cases = {b"hello world": "6828031bd8f00610dce10d726b03190000000000", b"": "0" * 40,
+                 big: "76874c5778b6fda87f1464ce09f578b6017be7ff"}
+        for data, want in cases.items():
+            self.assertEqual(self.Q().update(data).hexdigest(), want)
+            h = self.Q()
+            for k in range(0, len(data), 977):
+                h.update(data[k:k + 977])
+            self.assertEqual(h.hexdigest(), want)
+
+    def test_onedrive_copy_matches_local_file_by_quickxor(self):
+        home, run = self.tmp / "home", self.tmp / "run"
+        home.mkdir()
+        (home / "deck.pdf").write_bytes(b"hello world")
+        listing = self.tmp / "od.json"
+        listing.write_text(lsjson([{"Path": "Docs/deck.pdf", "Size": 11, "ModTime": "2025-01-01T00:00:00Z",
+                                    "Hashes": {"quickxor": "6828031bd8f00610dce10d726b03190000000000"}}]))
+        self.run_py(SCAN, "--surface", "mac-local", "--root", home, "--out", run)
+        self.run_py(CLOUD_INV, "--remote", "onedrive-work:", "--from-json", listing, "--out", run)
+        self.run_py(MERGE, "--in", run, "--prefer", "mac-local")
+        with open(run / "duplicates.csv", newline="") as f:
+            actions = {r["path"]: r["action"] for r in csv.DictReader(f)}
+        self.assertEqual(actions, {str(home / "deck.pdf"): "keep", "onedrive-work:Docs/deck.pdf": "archive"})

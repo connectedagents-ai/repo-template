@@ -16,7 +16,8 @@ Everything here is **dry-run by default**, copies or archives instead of deletin
 | 2 | Rescue agent scratch work into one inbox repo | `bash mac-cleanup/collect_ai_workspaces.sh` → `--apply` |
 | 3 | Archive beginner-era Claude clutter and install the lean Claude Desktop config | `bash mac-cleanup/archive_claude_files.sh` → `--apply --install-desktop-config mac-cleanup/templates/claude_desktop_config.json` (undo: `~/Archive/claude-legacy-*/restore.sh`) |
 | 3b | Reset the Claude app/account itself (export → chats, projects, artifacts, scheduled, skills, connectors, plugins, extensions, memory) | `mac-cleanup/CLAUDE-APP-RESET.md` |
-| 3c | **Dedup** every surface (Mac, cloud folders, iCloud): parallel dry-run scan → plan → approved archive to external SSD | `dedup/README.md` · `bash dedup/run_dedup.sh` |
+| 3c | **Dedup** every surface (Mac, cloud folders, iCloud, and via their APIs Google Drive, OneDrive, SharePoint, pCloud): parallel dry-run scan → plan → approved archive (SSD, or each cloud's own archive folder) | `dedup/README.md` · `bash dedup/connect_cloud.sh` · `bash dedup/start_here.sh` |
+| 3e | Microsoft tenants: finish the netzerolending.io move (mail done 2026-05-21, files not yet), personal OneDrive, retire the old tenant | `microsoft/TENANT-MIGRATION.md` |
 | 3d | Wire **Codex + Grok CLI** (and every AI tool) to one core MCP set, one install per CLI, and audit agent access (bot vaults, AI OAuth apps) | `mcp/README.md` · `mcp/park_mcp_servers.py` |
 | 4 | Reset global agent config | copy `mac-cleanup/templates/CLAUDE.md` + `settings.json` into `~/.claude/`. Configure the other CLIs per `../docs/GITHUB-SETUP.md` §4 |
 | 5 | Set up the GitHub org, apps and CLI | `../docs/GITHUB-SETUP.md` |

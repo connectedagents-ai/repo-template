@@ -24,7 +24,7 @@ def remote_type(remote):
     out = subprocess.run(["rclone", "listremotes", "--long"], capture_output=True, text=True).stdout
     for line in out.splitlines():
         name, _, typ = line.partition(":")
-        if f"{name}:" == remote:
+        if name == remote.split(":", 1)[0]:
             return typ.strip()
     return ""
 
@@ -50,14 +50,16 @@ def parse(lines):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--remote", required=True, help="rclone remote name with colon, e.g. gdrive-powerconnection:")
+    ap.add_argument("--remote", required=True, help="rclone remote, optionally with a folder: gdrive-powerconnection:  or  sp-legal:Shared Documents")
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--from-json", type=Path, help="read a saved `rclone lsjson -R --hash` output instead of calling rclone")
     ap.add_argument("--legal-pattern", default=DEFAULT_LEGAL)
     a = ap.parse_args()
-    if not a.remote.endswith(":"):
+    if ":" not in a.remote:
         a.remote += ":"
-    surface = re.sub(r"[^A-Za-z0-9._-]", "_", a.remote[:-1])
+    name = a.remote.split(":", 1)[0]
+    surface = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    prefix = a.remote if a.remote.endswith((":", "/")) else a.remote + "/"
     legal = re.compile(a.legal_pattern, re.I)
     a.out.mkdir(parents=True, exist_ok=True)
     out = a.out / f"inventory-{surface}.csv"
@@ -71,7 +73,7 @@ def main():
             if item.get("IsDir") or size <= 0:  # folders, Google-native docs (size -1) and empty files
                 skipped += 1
                 continue
-            path = f"{a.remote}{item['Path']}"
+            path = f"{prefix}{item['Path']}"
             hashes = ";".join(f"{t}:{v}" for t, v in sorted((item.get("Hashes") or {}).items()) if v)
             try:
                 mtime = int(datetime.datetime.fromisoformat(item.get("ModTime", "").replace("Z", "+00:00")).timestamp())

@@ -5,7 +5,7 @@
 
 Only files whose size collides with another file are hashed (sha256), and only if they are local.
 Cloud-only placeholders are never opened; they can still be matched by name + size as "probable" duplicates.
-Cloud-account inventories (cloud_inventory.py) carry the provider's own checksums (md5/sha1/sha256): cloud files are
+Cloud-account inventories (cloud_inventory.py) carry the provider's own checksums (md5/sha1/sha256, OneDrive quickxor): cloud files are
 matched on those without downloading, and a local file that collides in size with one is also hashed with that
 algorithm so local ↔ cloud copies are matched exactly.
 Outputs in <dir>:
@@ -16,15 +16,18 @@ Outputs in <dir>:
 Keeper per group: first --prefer surface present, then shortest path, then oldest mtime.
 Legal-flagged files are never planned for archive; groups containing them are reported as flag-legal.
 """
-import argparse, csv, glob, hashlib, os, re
+import argparse, csv, glob, hashlib, os, re, sys
 from collections import defaultdict
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from quickxorhash import QuickXorHash  # noqa: E402  (OneDrive / SharePoint checksum)
+
 NOISE = re.compile(r"(\s*\(\d+\)|[ _-]*copy( \d+)?|[ _-]*v\d+|[ _-]*final|[ _-]*\d{4}[-_.]?\d{2}[-_.]?\d{2}(t\d+z?)?|[ _-]*\d{6,})$", re.I)
 
 
-HASHERS = {"sha256": hashlib.sha256, "sha1": hashlib.sha1, "md5": hashlib.md5}
+HASHERS = {"sha256": hashlib.sha256, "sha1": hashlib.sha1, "md5": hashlib.md5, "quickxor": QuickXorHash}
 
 
 def file_hashes(path, types=("sha256",)):
