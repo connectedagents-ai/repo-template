@@ -12,7 +12,7 @@ _Template. Have the client's counsel review it before use. This is not legal adv
 4. **Secrets.** Provider records the existence and location of credentials, never their values. Credentials found exposed will be
    reported immediately so Client can rotate them.
 4b. **Browser and password-manager metadata.** ☐ Client consents to reading browser history and bookmarks (Chrome, Edge, Safari and others)
-   and 1Password item titles and domains to discover accounts. History is reduced to known-platform domains and AI project links. Full browsing
+   1Password item titles and domains, and the Apple Mail index (accounts, sender domains, and subjects of registrar, billing, security and bounce alerts only) to discover accounts. History is reduced to known-platform domains and AI project links. Full browsing
    history, search terms and password values are not exported.
 5. **Sensitive data.** Data flagged as privileged, regulated or personal is not opened, copied or moved except as Client and counsel direct.
 6. **Access.** Access granted to Provider is logged (T-05) and revoked at close.

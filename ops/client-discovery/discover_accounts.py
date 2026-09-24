@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """discover_accounts.py — find every platform/account a client uses, from browser history, bookmarks,
-1Password item *titles/domains* (never secrets) and Obsidian vault registry. READ-ONLY; metadata only.
+1Password item *titles/domains* (never secrets), Obsidian vault registry, macOS Internet Accounts and the Apple Mail index
+(all mail accounts in Mail.app, e.g. iCloud, Gmail, Exchange). READ-ONLY; metadata only.
 
     python3 discover_accounts.py --out <dir>            # used by run_discovery.sh
 
@@ -10,8 +11,12 @@ Writes to <dir>:
   bookmarks.md              bookmarks grouped by folder (title + domain)
   1password-items.csv       vault, category, title, domain  (only if `op` is signed in)
   obsidian-vaults.md        vault paths + sizes
+  mail-accounts.csv         every Mail.app account (username), message count, last received + macOS Internet Accounts
+  mail-alerts.csv           registrar/billing/security/bounce alerts only: date, account, sender domain, subject
 Privacy: full browsing history and search terms are NOT exported — only known-platform domains are counted, and page
-titles are kept only for AI project-type URLs. Chromium DBs are copied to a temp file first (browsers lock them).
+titles are kept only for AI project-type URLs. Mail: sender domains are counted; subjects are kept only for alert-type
+messages (expiry, renewal, parked, suspension, payment, sign-in, bounces). Bodies are never read.
+Needs Terminal "Full Disk Access" for Safari and Mail. Chromium DBs are copied to a temp file first (browsers lock them).
 """
 import argparse, csv, datetime, glob, json, os, plistlib, re, shutil, sqlite3, subprocess, tempfile
 from collections import defaultdict
@@ -156,6 +161,51 @@ def bookmark_rows():
             print(f"  skip Safari bookmarks: {e}")
 
 
+ALERT = re.compile(r"expir|renew|parked|suspen|cancel|past due|payment (fail|declin|problem)|update (your )?payment|"
+                   r"delivery status|undeliverable|not delivered|mail delivery|security alert|new sign.?in|password reset|"
+                   r"verify your|unusual activity|domain", re.I)
+
+
+def mail_accounts_map():
+    """account identifier (UUID) → (username, type) from macOS Internet Accounts."""
+    out = {}
+    db = HOME / "Library/Accounts/Accounts4.sqlite"
+    if db.exists():
+        q = ("SELECT a.ZIDENTIFIER, a.ZUSERNAME, a.ZACCOUNTDESCRIPTION, t.ZACCOUNTTYPEDESCRIPTION FROM ZACCOUNT a "
+             "LEFT JOIN ZACCOUNTTYPE t ON a.ZACCOUNTTYPE = t.Z_PK")
+        for ident, user, desc, typ in read_sqlite(db, q):
+            out[ident] = (user or desc or "", typ or "")
+    return out
+
+
+def apple_mail(hit):
+    """Metadata from Mail.app's Envelope Index: accounts, platform senders, alert subjects."""
+    idx = sorted(glob.glob(str(HOME / "Library/Mail/V*/MailData/Envelope Index")))
+    accounts = mail_accounts_map()
+    acct_rows, alerts = {}, []
+    if not idx:
+        print("  Apple Mail: no Envelope Index (Mail not used, or Terminal lacks Full Disk Access)")
+        return acct_rows, alerts, accounts
+    q = ("SELECT mb.url, a.address, s.subject, m.date_received FROM messages m "
+         "JOIN mailboxes mb ON m.mailbox = mb.ROWID LEFT JOIN addresses a ON m.sender = a.ROWID "
+         "LEFT JOIN subjects s ON m.subject = s.ROWID")
+    for url, sender, subject, received in read_sqlite(idx[-1], q):
+        acct_id = urlparse(url or "").netloc
+        user = accounts.get(acct_id, (acct_id, ""))[0] or acct_id
+        ts = datetime.datetime.fromtimestamp(received or 0)
+        r = acct_rows.setdefault(user, {"messages": 0, "last": ts, "type": accounts.get(acct_id, ("", ""))[1]})
+        r["messages"] += 1
+        r["last"] = max(r["last"], ts)
+        domain = (sender or "").rsplit("@", 1)[-1].lower().strip(">")
+        c = classify(domain)
+        if c:
+            hit(c[0], c[1], "Apple Mail sender", 1, ts)
+        is_bounce = domain.startswith(("mailer-daemon", "postmaster")) or (sender or "").lower().startswith(("mailer-daemon", "postmaster"))
+        if (c or is_bounce) and subject and ALERT.search(subject):
+            alerts.append([ts.strftime("%Y-%m-%d"), user, domain, subject[:160]])
+    return acct_rows, alerts, accounts
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--out", type=Path, required=True)
@@ -212,6 +262,8 @@ def main():
         except Exception as e:
             print(f"  skip 1Password: {e} (sign in with `op signin`)")
 
+    mail_rows, mail_alerts, sys_accounts = apple_mail(hit)
+
     # Obsidian vault registry
     obs = HOME / "Library/Application Support/obsidian/obsidian.json"
     vault_md = ["# Obsidian vaults", ""]
@@ -248,6 +300,19 @@ def main():
             w.writerow(["vault", "category", "title", "domain"])
             w.writerows(sorted(op_rows))
     (a.out / "obsidian-vaults.md").write_text("\n".join(vault_md) + "\n")
+    with open(a.out / "mail-accounts.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["source", "account", "type", "messages", "last_received"])
+        for user, r in sorted(mail_rows.items()):
+            w.writerow(["Apple Mail", user, r["type"], r["messages"], r["last"].strftime("%Y-%m-%d")])
+        for user, typ in sorted(set(sys_accounts.values())):
+            if user:
+                w.writerow(["macOS Internet Accounts", user, typ, "", ""])
+    with open(a.out / "mail-alerts.csv", "w", newline="") as f:
+        w = csv.writer(f)
+        w.writerow(["date", "account", "sender_domain", "subject"])
+        w.writerows(sorted(mail_alerts, reverse=True))
+    print(f"  mail accounts: {len(mail_rows)} · mail alerts: {len(mail_alerts)}")
     print(f"  platforms: {len(plat)} · AI projects: {len(projects)} · bookmarks: {n_bm} · 1Password items: {len(op_rows)}")
 
 

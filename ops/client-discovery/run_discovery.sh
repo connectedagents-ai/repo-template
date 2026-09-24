@@ -86,7 +86,7 @@ for pair in ".claude:Claude Code" ".codex:OpenAI Codex CLI" ".cursor:Cursor" ".g
 done
 echo "  → $REG ($(($(wc -l < "$REG") - 1)) rows)"
 
-step "3/7 Browsers (Chrome, Edge, Safari, Brave, Arc, Comet), bookmarks, 1Password titles, Obsidian vaults"
+step "3/7 Browsers (Chrome, Edge, Safari, Brave, Arc, Comet), bookmarks, Apple Mail + Internet Accounts, 1Password titles, Obsidian vaults"
 python3 "$HERE/discover_accounts.py" --out "$OUTDIR" 2>>"$LOG" | tee -a "$LOG"
 if [ -f "$OUTDIR/platforms-detected.csv" ]; then
   tail -n +2 "$OUTDIR/platforms-detected.csv" | while IFS=, read -r plat layer ev visits last tenants; do
@@ -126,6 +126,7 @@ Generated $(date) on $(hostname). Read-only; metadata only.
 | T-03-platform-register.csv | platforms/accounts detected on this Mac (pre-filled; complete with cloud + client input) | A, B, J |
 | platforms-detected.csv | platforms seen in browser history/bookmarks, 1Password and Obsidian, with tenant/workspace names | A, B, D, J |
 | ai-projects.csv | AI projects, GPTs, Spaces, Gems, notebooks found in browser history | H3 |
+| mail-accounts.csv, mail-alerts.csv | every Mail.app / Internet Account (iCloud, Gmail, Exchange…) + registrar, billing, security and bounce alerts (subjects only) | B9, D4, J1b |
 | bookmarks.md, 1password-items.csv, obsidian-vaults.md | bookmarks (title + domain), 1Password item titles and domains (no secrets), Obsidian vaults | B, C1, G1 |
 | mac-audit.md | Claude/AI tool configs, MCP servers, stray files, git repos, AI workspaces | C3, F3–F4, H4–H6 |
 | preview-*.txt | what rescue/cleanup *would* do (dry runs) | F3, H6 |
