@@ -53,9 +53,15 @@ for SRC in "$@"; do
       if gh api -X POST "repos/$SRC/$name/transfer" -f new_owner="$TARGET" >/dev/null; then
         # transfers are asynchronous: wait (up to ~2 min) until the repo answers under the new owner
         tries=0
-        until gh api "repos/$TARGET/$name" --jq .full_name 2>/dev/null | grep -qix "$TARGET/$name" || [ "$tries" -ge 24 ]; do
+        arrived=0
+        until [ "$tries" -ge 24 ]; do
+          if gh api "repos/$TARGET/$name" --jq .full_name 2>/dev/null | grep -qix "$TARGET/$name"; then arrived=1; break; fi
           sleep 5; tries=$((tries + 1))
         done
+        if [ "$arrived" = 0 ]; then
+          echo "    ⏳ transfer of $SRC/$name requested but NOT confirmed after 2 min. Check GitHub, then (if it was archived) run: gh repo archive $TARGET/$name --yes" >&2
+          continue
+        fi
         echo "    ✓ moved → $TARGET/$name"
         if [ "$archived" = true ]; then
           gh repo archive "$TARGET/$name" --yes >/dev/null 2>&1 \

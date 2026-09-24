@@ -83,6 +83,15 @@ archive() {
   [ "$APPLY" = 1 ] || return 0
   dst="$DEST/moved/$rel"
   mkdir -p "$(dirname "$dst")"
+  # a move to another disk is a copy: check the destination has room first
+  if [ "$(df -P "$src" | awk 'NR==2 {print $1}')" != "$(df -P "$DEST" | awk 'NR==2 {print $1}')" ]; then
+    need_kb=$(du -sk "$src" 2>/dev/null | cut -f1)
+    free_kb=$(df -k "$DEST" | awk 'NR==2 {print $4}')
+    if [ $((free_kb - need_kb)) -lt $(( ${MIN_FREE_GB:-15} * 1024 * 1024 )) ]; then
+      say "  ✋ STOP: moving ~/$rel to another disk would leave less than ${MIN_FREE_GB:-15} GB free there. Nothing further was moved." >&2
+      exit 1
+    fi
+  fi
   mv "$src" "$dst"
   printf 'move\t%s\t%s\n' "$src" "$dst" >> "$MANIFEST"
   printf 'mkdir -p %q && mv %q %q\n' "$(dirname "$src")" "$dst" "$src" >> "$RESTORE"

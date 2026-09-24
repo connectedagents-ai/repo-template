@@ -104,6 +104,25 @@ def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
     return n
 
 
+def ensure_room(dest: Path, need: int, min_free_gb: float):
+    """Stop before a copy that would leave less than min_free_gb free on dest's disk."""
+    probe = dest
+    while not probe.exists():
+        probe = probe.parent
+    free = shutil.disk_usage(probe).free
+    if free - need < min_free_gb * 1024**3:
+        sys.exit(f"STOP: copying {need / 1e9:.2f} GB more would leave less than {min_free_gb} GB free on {probe} "
+                 f"({free / 1e9:.1f} GB free now). Nothing further was copied. Use --library /Volumes/<SSD>/ai-library-raw.")
+
+
+def tree_size(d: Path) -> int:
+    total = 0
+    for dirpath, dirnames, filenames in os.walk(d):
+        dirnames[:] = [x for x in dirnames if x not in SKIP_DIRS]
+        total += sum(os.path.getsize(os.path.join(dirpath, f)) for f in filenames if not f.startswith(".env"))
+    return total
+
+
 def walk(root: Path):
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS]
@@ -150,16 +169,6 @@ def main():
         else:
             print(f"missing: {inp}", file=sys.stderr)
 
-    if a.apply:
-        need = sum(f.stat().st_size for r, _ in roots for f in ([r] if r.is_file() else r.rglob("*")) if f.is_file())
-        probe = lib if lib.exists() else lib.parent
-        while not probe.exists():
-            probe = probe.parent
-        free = shutil.disk_usage(probe).free
-        if free - need < a.min_free_gb * 1024**3:
-            sys.exit(f"STOP: copying {need / 1e9:.1f} GB into {lib} would leave less than {a.min_free_gb} GB free "
-                     f"({free / 1e9:.1f} GB free now). Nothing was copied. Use --library /Volumes/<SSD>/ai-library-raw instead.")
-
     for root, origin in roots:
         files = [root] if root.is_file() else None
         if files is None:
@@ -173,6 +182,7 @@ def main():
                     print(f"skill      {d} → {dest.relative_to(lib)}")
                     stats["skills"] += 1
                     if a.apply:
+                        ensure_room(dest, tree_size(d), a.min_free_gb)
                         shutil.copytree(d, dest, ignore=shutil.ignore_patterns(*SKIP_DIRS, ".env*"))
                     dirnames[:] = []
                     continue
@@ -200,6 +210,7 @@ def main():
                      "title": f.stem, "ingested": today, "bytes": f.stat().st_size, "origins": [orig]}
             by_hash[h] = entry
             if a.apply:
+                ensure_room(dest, f.stat().st_size, a.min_free_gb)
                 dest.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(f, dest)
                 catalog[entry["path"]] = entry

@@ -17,7 +17,25 @@ INBOX="${INBOX:-$HOME/Code/connectedagents-ai/ai-workspace-inbox}"
 
 EXCLUDES="--exclude=node_modules --exclude=.venv --exclude=venv --exclude=__pycache__ --exclude=.next --exclude=dist --exclude=build --exclude=.turbo --exclude=.DS_Store --exclude=.env --exclude=.env.* --exclude=*.pem --exclude=*.key --exclude=*.p12 --exclude=id_rsa* --exclude=id_ed25519* --exclude=*.sqlite --exclude=*.log"
 
-MIN_FREE_GB="${MIN_FREE_GB:-15}"   # never let a copy leave the destination disk with less than this free
+MIN_FREE_GB="${MIN_FREE_GB:-15}"
+# size (KB) of what rsync will actually copy: same excluded dirs/files as EXCLUDES below
+copy_size_kb() {
+  python3 - "$1" <<'PYSZ'
+import fnmatch, os, sys
+dirs = {"node_modules", ".venv", "venv", "__pycache__", ".next", "dist", "build", ".turbo", ".git"}
+files = [".DS_Store", ".env", ".env.*", "*.pem", "*.key", "*.p12", "id_rsa*", "id_ed25519*", "*.sqlite", "*.log"]
+total = 0
+for dp, dn, fn in os.walk(sys.argv[1]):
+    dn[:] = [d for d in dn if d not in dirs]
+    for f in fn:
+        if not any(fnmatch.fnmatch(f, p) for p in files):
+            try:
+                total += os.lstat(os.path.join(dp, f)).st_size
+            except OSError:
+                pass
+print(total // 1024)
+PYSZ
+}   # never let a copy leave the destination disk with less than this free
 PLANNED=""
 
 [ "$APPLY" = 1 ] && mkdir -p "$INBOX" && [ ! -d "$INBOX/.git" ] && git -C "$INBOX" init -q -b main && \
@@ -43,11 +61,11 @@ for spec in \
       printf 'push-it   %-12s %s  (git repo with remote: commit + push there, then migrate)\n' "$tool" "${d#$HOME/}"
       continue
     fi
-    printf 'collect   %-12s %s → %s  (%s)\n' "$tool" "${d#$HOME/}" "${INBOX#$HOME/}/$tool/$name" "$(du -sh "$d" 2>/dev/null | cut -f1)"
+    printf 'collect   %-12s %s → %s  (%s MB to copy)\n' "$tool" "${d#$HOME/}" "${INBOX#$HOME/}/$tool/$name" "$(( $(copy_size_kb "$d") / 1024 ))"
     PLANNED="$PLANNED
 $d"
     if [ "$APPLY" = 1 ]; then
-      need_kb=$(du -sk "$d" 2>/dev/null | cut -f1)
+      need_kb=$(copy_size_kb "$d")
       free_kb=$(df -k "$(dirname "$INBOX")" | awk 'NR==2 {print $4}')
       if [ $((free_kb - need_kb)) -lt $((MIN_FREE_GB * 1024 * 1024)) ]; then
         echo "  ✋ STOP: copying ${d#$HOME/} ($((need_kb / 1024)) MB) would leave less than ${MIN_FREE_GB} GB free. Nothing more will be copied." >&2
