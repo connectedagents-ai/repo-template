@@ -1,0 +1,2 @@
+id,severity,checklist_ref,title,evidence,impact,recommendation,owner,status,opened,due,closed
+F-001,P0,C2,Example: API keys committed to repo X,"file path + commit, values NOT copied",Keys usable by anyone with repo access,Rotate all listed keys; enable push protection; purge history if required,Client,Open,,,

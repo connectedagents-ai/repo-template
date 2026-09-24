@@ -1,0 +1,6 @@
+id,layer,platform,account_or_tenant,entity,owner,status,plan_or_sku,monthly_cost,sso,mfa,data_held,sensitivity,evidence,decision,target,wire_in_done,notes
+P-001,L0-identity,Microsoft Entra ID,,,,Unknown,,,n/a,,,,,Decide,,,
+P-002,L0-secrets,1Password,,,,Unknown,,,,,,,,Decide,,,
+P-003,L1-cloud,Google Cloud,,,,Unknown,,,,,,,,Decide,,,
+P-004,L2-workspace,Google Workspace,,,,Unknown,,,,,,,,Decide,,,
+P-005,L3-code,GitHub,,,,Unknown,,,,,,,,Decide,,,

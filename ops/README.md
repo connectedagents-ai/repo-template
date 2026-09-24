@@ -5,6 +5,7 @@ Everything here is **dry-run by default**, copies or archives instead of deletin
 
 | # | Step | Command / doc |
 |---|---|---|
+| 00 | **New client?** Run the full SOP instead: `../docs/sop/01-CLIENT-ONBOARDING-SOP.md` + checklist `02-…` + templates `../docs/sop/templates/`. One-command discovery: `bash client-discovery/run_discovery.sh <client>`. Claude skill: `client-discovery/skill/client-discovery/` (copy to `~/.claude/skills/`) | |
 | 0a | Inventory the cloud stack top-down (Entra → Azure → GCP → GitHub → Vercel → Cloudflare → 1Password), then decide D1–D6 | `bash cloud-inventory/inventory_cloud.sh` · `../docs/CLOUD-ARCHITECTURE.md` |
 | 0 | **Rotate exposed secrets** and turn on push protection | `github-consolidation/MIGRATION-PLAN.md` step 0 · `../docs/GITHUB-SETUP.md` §1 |
 | 1 | Audit the Mac: Claude, Codex, Cursor, Antigravity/Gemini, Grok, Perplexity, ChatGPT and Copilot files, git repos, disk hogs | `bash mac-cleanup/audit_claude_files.sh` → read `~/claude-audit-*.md` |
