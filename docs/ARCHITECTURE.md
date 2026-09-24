@@ -18,6 +18,13 @@ GitHub: connectedagents-ai (the only org)
 ~/.claude  ~/.codex  ~/.cursor  ~/.gemini  ~/.grok   tool state only. Rules and configs are symlinked from agent-central-config
 ```
 
+## Work tracking: Linear is the hub
+Linear workspace **Powerconnection** (teams POW, LIT, SALES) is where dev work is planned and tracked; GitHub holds the code,
+AGENTS.md the rules. Coding agents take work from Linear and report back to it: Devin, Cursor, Codex and Claude through their Linear
+integrations or the Linear MCP server, and GitHub PRs link automatically when the branch or PR title contains the issue key.
+Open consolidation items already live there: POW-89 (Warp), POW-94 (Devin), POW-232 (reporting protocol for external agents),
+P-POW-52 (Master Configuration & Dev Tools Alignment), P-POW-38 (Corpus Consolidation), POW-149 (corpus inventory).
+
 ## Rules of the road
 1. **One rules file:** `AGENTS.md` in every repo. Tool-specific files are one-line pointers to it.
 2. **One secret store:** 1Password. Configs contain `op://` references, never values.

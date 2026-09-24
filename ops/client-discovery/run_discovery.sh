@@ -67,7 +67,7 @@ step "2/7 Accounts and platforms detected (→ T-03)"
 # Desktop apps → platforms
 for pair in "Claude:L5-ai:Claude" "ChatGPT:L5-ai:ChatGPT" "Perplexity:L5-ai:Perplexity" "Comet:L5-ai:Perplexity Comet" "Grok:L5-ai:Grok" \
             "Cursor:L3-code:Cursor" "Antigravity:L3-code:Google Antigravity" "Windsurf:L3-code:Windsurf" "Visual Studio Code:L3-code:VS Code" \
-            "Codex:L3-code:OpenAI Codex" "Devin:L3-code:Devin" "GitHub Desktop:L3-code:GitHub Desktop" \
+            "Codex:L3-code:OpenAI Codex" "Devin:L3-code:Devin" "Warp:L3-code:Warp" "GitHub Desktop:L3-code:GitHub Desktop" \
             "Microsoft Outlook:L2-workspace:Microsoft 365" "Microsoft Teams:L2-workspace:Microsoft 365" "Google Drive:L2-workspace:Google Drive" \
             "OneDrive:L2-workspace:OneDrive" "Dropbox:L2-workspace:Dropbox" "1Password:L0-secrets:1Password" "Okta Verify:L0-identity:Okta" \
             "Notion:L5-saas:Notion" "Slack:L5-saas:Slack" "Linear:L5-saas:Linear" "Obsidian:L5-saas:Obsidian" "Docker:L4-runtime:Docker Desktop"; do

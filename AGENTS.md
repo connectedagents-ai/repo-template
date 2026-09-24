@@ -1,7 +1,7 @@
 # AGENTS.md: rules for every coding agent and human in this repo
 
 This is the **single source of truth** for coding rules. Claude Code, Codex, Cursor, GitHub Copilot, Gemini/Antigravity,
-Grok CLI and Devin all read this file, directly or through a one-line pointer (`CLAUDE.md`, `GEMINI.md`,
+Grok CLI, Devin and Warp all read this file, directly or through a one-line pointer (`CLAUDE.md`, `GEMINI.md`,
 `.github/copilot-instructions.md`). Change the rules here, never in the pointers.
 
 ## 0. Project facts (fill in when creating a repo from the template)
@@ -21,6 +21,8 @@ Grok CLI and Devin all read this file, directly or through a one-line pointer (`
 ## 2. Workflow
 - Branch per task: `<type>/<short-slug>` (`feat/`, `fix/`, `chore/`, `docs/`). Agents may use their tool prefix (`claude/`, `codex/`, `cursor/`, `devin/`).
 - Every change lands through a PR into `main`. No direct pushes, no force-pushes to shared branches.
+- Linear (workspace `powerconnection`) is the system of record for dev work. When an issue exists, put its key in the branch name
+  or PR title (`feat/POW-123-intake-form`) so Linear links the PR and closes the issue on merge.
 - Commit messages follow Conventional Commits: `feat: …`, `fix: …`, `chore: …`, `docs: …`, `refactor: …`, `test: …`.
 - Keep PRs small and focused. Explain the *why* in the description.
 - Before you open or update a PR: run `make lint` and `make test` and fix what fails. Say plainly in the PR if something could not be run.

@@ -37,7 +37,7 @@ CATALOG = [
     ("perplexity.ai", "Perplexity", "L5-ai"), ("gemini.google.com", "Gemini", "L5-ai"), ("notebooklm.google.com", "NotebookLM", "L5-ai"),
     ("aistudio.google.com", "Google AI Studio", "L5-ai"), ("copilot.microsoft.com", "Microsoft Copilot (consumer)", "L5-ai"),
     ("m365.cloud.microsoft", "Microsoft 365 Copilot", "L5-ai"), ("copilotstudio.microsoft.com", "Copilot Studio", "L5-ai"),
-    ("cursor.com", "Cursor", "L3-code"), ("devin.ai", "Devin", "L3-code"), ("antigravity.google", "Google Antigravity", "L3-code"),
+    ("cursor.com", "Cursor", "L3-code"), ("devin.ai", "Devin", "L3-code"), ("warp.dev", "Warp", "L3-code"), ("antigravity.google", "Google Antigravity", "L3-code"),
     ("openrouter.ai", "OpenRouter", "L5-ai"), ("groq.com", "Groq", "L5-ai"), ("huggingface.co", "Hugging Face", "L4-runtime"),
     ("replit.com", "Replit", "L3-code"), ("lovable.dev", "Lovable", "L3-code"), ("bolt.new", "Bolt", "L3-code"), ("v0.dev", "v0", "L3-code"), ("v0.app", "v0", "L3-code"),
     ("github.com", "GitHub", "L3-code"), ("gitlab.com", "GitLab", "L3-code"), ("bitbucket.org", "Bitbucket", "L3-code"),

@@ -24,4 +24,5 @@ Everything here is **dry-run by default**, copies or archives instead of deletin
 | 6 | Move every other org or account into `connectedagents-ai` | `bash github-consolidation/migrate_to_connectedagents.sh Connected-Energy-AI` → `--apply` |
 | 7 | Collapse ~280 repos into ~10 | `github-consolidation/MIGRATION-PLAN.md` step 2 · `bash github-consolidation/merge_into_monorepo.sh --apply <target> <owner/src> <path>` → PR → archive the source |
 | 8 | Export Perplexity, ChatGPT/OpenAI, Grok/xAI, Copilot (3 accounts), Google (Gemini, NotebookLM, AI Studio), Antigravity, Claude → central library | `ai-library/README.md` · `python3 ai-library/ingest_library.py --source <tool> --account <label> <export>` |
+| 8b | Settle the **Global Ontology** (names, tags, taxonomy, topology, schema) from the scattered ontology files | `../docs/GLOBAL-ONTOLOGY.md` |
 | 9 | Clean up cloud agents' leftover branches and PRs (Codex, Cursor, Devin, Claude) | `github-consolidation/MIGRATION-PLAN.md` step 3 |

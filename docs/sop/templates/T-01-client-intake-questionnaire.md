@@ -33,7 +33,7 @@ _Send before kickoff. Answers can be rough. We verify everything during discover
 | Perplexity | | | | |
 | Gemini / NotebookLM / AI Studio | | | | |
 | Microsoft Copilot | | | | |
-| Cursor / Codex / Devin / Antigravity / other | | | | |
+| Cursor / Codex / Devin / Warp / Antigravity / other | | | | |
 
 ## 5. Crown jewels
 What data would hurt most to lose or leak? Where do you *think* it lives?

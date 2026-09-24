@@ -21,6 +21,8 @@ For each app: install it on `connectedagents-ai` → *Only select repositories* 
 | Cursor (background agents, Bugbot) | cursor.com → Settings → Integrations → GitHub | |
 | GitHub Copilot (coding agent + reviews) | Org → Copilot → Policies / Coding agent | Seats on the org. Instructions come from `.github/copilot-instructions.md` → `AGENTS.md` |
 | Devin | app.devin.ai → Settings → Integrations → GitHub | |
+| Warp (terminal + agent) | Warp → Settings → AI / Rules: it reads `AGENTS.md`; keep API keys in 1Password (Linear POW-89) | |
+| Linear | Linear → Settings → Integrations → GitHub: links branches/PRs named with the issue key and moves issues on merge | |
 | Gemini Code Assist / Antigravity, Grok, others | each tool's GitHub integration page | Only give write access where the agent actually works |
 
 Then audit: Org → Settings → **GitHub Apps** and **OAuth app policy**. Remove anything you don't recognize or no longer use.

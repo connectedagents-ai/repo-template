@@ -30,7 +30,7 @@ flowchart TD
   end
   subgraph L5[L5 · SaaS & AI tools]
     SAAS[Notion · Slack · Linear · HubSpot · Attio · Airtable · Stripe]
-    AI[Claude · ChatGPT/OpenAI · Grok/xAI · Perplexity · Gemini · Copilot · Cursor · Codex · Devin]
+    AI[Claude · ChatGPT/OpenAI · Grok/xAI · Perplexity · Gemini · Copilot · Cursor · Codex · Devin · Warp]
   end
   ENTRA -->|SSO / SCIM| M365 & GWS & GH & SAAS & AI
   ENTRA -->|RBAC| AZ
