@@ -154,7 +154,12 @@ def tree_size(d: Path) -> int:
 def unpack_zip(inp: Path, tmp_parent: Path, min_free_gb: float) -> Path:
     """Extract next to the library (not into the system temp dir), after checking the unpacked size fits."""
     with zipfile.ZipFile(inp) as z:
-        ensure_room(tmp_parent, sum(i.file_size for i in z.infolist()), min_free_gb)
+        members = z.infolist()
+        for m in members:  # zipfile already strips "../" and leading "/", but refuse such archives outright
+            p = Path(m.filename)
+            if p.is_absolute() or ".." in p.parts or m.filename.startswith(("/", "\\")):
+                raise SystemExit(f"refusing {inp}: member {m.filename!r} points outside the archive")
+        ensure_room(tmp_parent, sum(m.file_size for m in members), min_free_gb)
         t = Path(tempfile.mkdtemp(prefix=".ingest-", dir=tmp_parent))
         z.extractall(t)
     return t

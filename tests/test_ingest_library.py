@@ -64,6 +64,15 @@ class IngestLibraryTest(TempDirTest):
         self.assertIn("STOP", r.stderr)
         self.assertEqual(list(self.tmp.glob(".ingest-*")), [])
 
+    def test_zip_with_path_escape_is_refused_before_extracting(self):
+        z = self.tmp / "evil.zip"
+        with zipfile.ZipFile(z, "w") as f:
+            f.writestr("../../escaped.txt", "x")
+        r = self.run_py(INGEST, "--source", "chatgpt", "--library", self.lib, "--min-free-gb", 0, z, check=False)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("points outside the archive", r.stderr)
+        self.assertEqual(list(self.tmp.glob(".ingest-*")), [])
+
     def test_refuses_library_inside_git_work_tree(self):
         subprocess.run(["git", "init", "-q", str(self.tmp / "repo")], check=True)
         self.exp.mkdir()

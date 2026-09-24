@@ -7,8 +7,8 @@
 #     SSD copies are preferred as keepers, so Mac copies of SSD files show up as the ones to archive
 #   CLOUD_REMOTES="gdrive-powerconnection: pcloud:" OUT=... bash ops/dedup/run_dedup.sh   # also list cloud accounts
 #     through their APIs (rclone; set up with connect_cloud.sh). Uses the provider's stored checksums: nothing downloads.
-#     When a Google Drive (or OneDrive/SharePoint) remote is listed, the ~/Library/CloudStorage/GoogleDrive-*
-#     (or OneDrive-*) folders are not scanned too: the same files would otherwise look like duplicates of themselves.
+#   SKIP_CLOUDSTORAGE="GoogleDrive-me@x.com OneDrive-OneWishLabs" ...   # local sync folders whose account is already in
+#     CLOUD_REMOTES, so the same files aren't listed twice (start_here.sh asks). Only the named folders are skipped.
 #     pCloud Drive mounts are never walked.
 #
 # Surfaces: mac-local (Desktop, Documents, Downloads, ~/Code), each ~/Library/CloudStorage/* folder (Google Drive,
@@ -26,22 +26,14 @@ label() { basename "$1" | tr 'A-Z' 'a-z' | sed 's/[^a-z0-9._-]/-/g'; }
 scan() { python3 "$HERE/dedup_scan.py" --out "$RUN" "$@" >>"$RUN/scan.log" 2>&1 & pids="$pids $!"; }
 
 scan --surface mac-local --root "$HOME/Desktop" --root "$HOME/Documents" --root "$HOME/Downloads" --root "$HOME/Code"
-DRIVE_VIA_API=0
-ONEDRIVE_VIA_API=0
 for r in ${CLOUD_REMOTES:-}; do
-  case "$(rclone listremotes --long 2>/dev/null | awk -v n="${r%%:*}:" '$1 == n {print $2}')" in
-    drive) DRIVE_VIA_API=1;;
-    onedrive) ONEDRIVE_VIA_API=1;;
-  esac
   python3 "$HERE/cloud_inventory.py" --remote "$r" --out "$RUN" >>"$RUN/scan.log" 2>&1 & pids="$pids $!"
 done
 cloud_folder_skipped() {
-  case "$(basename "$1")" in
-    GoogleDrive-*) [ "$DRIVE_VIA_API" = 1 ];;
-    OneDrive-*) [ "$ONEDRIVE_VIA_API" = 1 ];;
-    *[Pp][Cc]loud*) true;;  # pCloud Drive is a virtual drive: reading files would download them. Use its API instead
-    *) false;;
-  esac
+  local b; b="$(basename "$1")"
+  case "$b" in *[Pp][Cc]loud*) return 0;; esac  # pCloud Drive is a virtual drive: reading files would download them
+  case " ${SKIP_CLOUDSTORAGE:-} " in *" $b "*) return 0;; esac
+  return 1
 }
 for d in "$HOME"/Library/CloudStorage/*; do
   [ -d "$d" ] || continue

@@ -18,6 +18,24 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dedup_scan import DEFAULT_LEGAL  # noqa: E402
 
 DRIVE_FLAGS = ["--drive-skip-gdocs", "--drive-skip-shortcuts"]
+ARCHIVE_DIRS = ("_Dedup-Archive", "Dedup-Archive")  # earlier cloud_apply runs: never re-plan them
+
+
+def in_archive(path):
+    return any(part in ARCHIVE_DIRS for part in path.split("/"))
+
+
+def parse_mtime(text):
+    """rclone emits RFC 3339 with up to 9 fractional digits; Python < 3.11 only parses 6."""
+    m = re.match(r"(\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d)(\.\d+)?(Z|[+-]\d\d:\d\d)?$", text or "")
+    if not m:
+        return 0
+    frac = (m.group(2) or "")[:7]
+    tz = "+00:00" if m.group(3) in (None, "Z") else m.group(3)
+    try:
+        return int(datetime.datetime.fromisoformat(m.group(1) + frac + tz).timestamp())
+    except ValueError:
+        return 0
 
 
 def remote_type(remote):
@@ -32,6 +50,7 @@ def remote_type(remote):
 def lsjson_lines(remote):
     """Stream `rclone lsjson` (one JSON object per line) without holding the whole listing in memory."""
     cmd = ["rclone", "lsjson", "-R", "--files-only", "--hash", "--fast-list", remote]
+    cmd += [f"--exclude=/{d}/**" for d in ARCHIVE_DIRS]
     if remote_type(remote) == "drive":
         cmd += DRIVE_FLAGS
     p = subprocess.Popen(cmd, stdout=subprocess.PIPE, text=True)
@@ -70,15 +89,12 @@ def main():
         w.writerow(["surface", "path", "size", "mtime", "local", "legal", "hashes"])
         for item in parse(lines):
             size = int(item.get("Size", -1))
-            if item.get("IsDir") or size <= 0:  # folders, Google-native docs (size -1) and empty files
+            if item.get("IsDir") or size <= 0 or in_archive(item.get("Path", "")):  # folders, Google-native docs (size -1), empty files, our archive
                 skipped += 1
                 continue
             path = f"{prefix}{item['Path']}"
             hashes = ";".join(f"{t}:{v}" for t, v in sorted((item.get("Hashes") or {}).items()) if v)
-            try:
-                mtime = int(datetime.datetime.fromisoformat(item.get("ModTime", "").replace("Z", "+00:00")).timestamp())
-            except ValueError:
-                mtime = 0
+            mtime = parse_mtime(item.get("ModTime", ""))
             is_legal = bool(legal.search(path))
             w.writerow([surface, path, size, mtime, 0, int(is_legal), hashes])
             n += 1

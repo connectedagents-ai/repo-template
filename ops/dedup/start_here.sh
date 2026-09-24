@@ -56,12 +56,27 @@ if command -v rclone >/dev/null 2>&1 && [ -n "$(rclone listremotes 2>/dev/null)"
   rclone listremotes | sed 's/^/     /'
   printf '  Include them? (y/n): '; read -r inc_cloud
   case "$inc_cloud" in y|Y|yes|YES) CLOUD_REMOTES="$(rclone listremotes | tr '\n' ' ')"; ok "Cloud accounts included (listed through their APIs).";; esac
+fi
+SKIP_CLOUDSTORAGE=""
+if [ -n "$CLOUD_REMOTES" ]; then
+  folders=()
+  for d in "$HOME"/Library/CloudStorage/GoogleDrive-* "$HOME"/Library/CloudStorage/OneDrive-*; do [ -d "$d" ] && folders+=("$(basename "$d")"); done
+  if [ ${#folders[@]} -gt 0 ]; then
+    printf '\n  These sync folders are on this Mac. Which ones belong to an account you just included? (so files are not counted twice)\n'
+    i=1; for f in "${folders[@]}"; do printf '     %d) %s\n' "$i" "$f"; i=$((i + 1)); done
+    printf '  Type the numbers separated by spaces, or press Return for none: '; read -r picks
+    for p in $picks; do
+      case "$p" in *[!0-9]*) continue;; esac
+      [ "$p" -ge 1 ] && [ "$p" -le ${#folders[@]} ] && SKIP_CLOUDSTORAGE="$SKIP_CLOUDSTORAGE ${folders[$((p - 1))]}"
+    done
+    [ -n "$SKIP_CLOUDSTORAGE" ] && ok "Will skip (already covered by its account):$SKIP_CLOUDSTORAGE"
+  fi
 else
   ok "No Google Drive / pCloud accounts connected (optional: bash ops/dedup/connect_cloud.sh, then run this again)."
 fi
 
 say "3/5 Scanning (this can take a while — leave this window open)"
-CLOUD_REMOTES="$CLOUD_REMOTES" SSD_ROOT="$SSD_ROOT" OUT="$SSD/dedup-runs" bash "$HERE/run_dedup.sh" || stop "The scan stopped with an error. Copy everything above and paste it into Claude."
+SKIP_CLOUDSTORAGE="$SKIP_CLOUDSTORAGE" CLOUD_REMOTES="$CLOUD_REMOTES" SSD_ROOT="$SSD_ROOT" OUT="$SSD/dedup-runs" bash "$HERE/run_dedup.sh" || stop "The scan stopped with an error. Copy everything above and paste it into Claude."
 RUN="$(ls -td "$SSD"/dedup-runs/*/ 2>/dev/null | head -1)"; RUN="${RUN%/}"
 [ -f "$RUN/PLAN.md" ] || stop "No report was produced. Copy everything above and paste it into Claude."
 

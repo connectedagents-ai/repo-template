@@ -136,3 +136,30 @@ class QuickXorHashTest(TempDirTest):
         with open(run / "duplicates.csv", newline="") as f:
             actions = {r["path"]: r["action"] for r in csv.DictReader(f)}
         self.assertEqual(actions, {str(home / "deck.pdf"): "keep", "onedrive-work:Docs/deck.pdf": "archive"})
+
+
+class CloudReviewFixesTest(TempDirTest):
+    def test_archive_folder_is_not_listed_again_and_nanosecond_times_parse(self):
+        listing = self.tmp / "l.json"
+        listing.write_text(lsjson([
+            {"Path": "Docs/a.pdf", "Size": 5, "ModTime": "2025-03-04T05:06:07.123456789Z", "Hashes": {"md5": "m"}},
+            {"Path": "_Dedup-Archive/20260101-000000/Docs/a.pdf", "Size": 5, "ModTime": "2025-03-04T05:06:07Z", "Hashes": {"md5": "m"}},
+        ]))
+        self.run_py(CLOUD_INV, "--remote", "gdrive-x:", "--from-json", listing, "--out", self.tmp)
+        with open(self.tmp / "inventory-gdrive-x.csv", newline="") as f:
+            rows = list(csv.DictReader(f))
+        self.assertEqual([r["path"] for r in rows], ["gdrive-x:Docs/a.pdf"])
+        self.assertEqual(rows[0]["mtime"], "1741064767")
+
+    def test_only_the_named_cloudstorage_folders_are_skipped(self):
+        home, out = self.tmp / "home", self.tmp / "out"
+        for acct in ("GoogleDrive-a@x.com", "GoogleDrive-b@x.com", "OneDrive-Personal"):
+            (home / "Library/CloudStorage" / acct).mkdir(parents=True)
+            (home / "Library/CloudStorage" / acct / "f.txt").write_text(acct)
+        env = {**os.environ, "HOME": str(home), "OUT": str(out), "SKIP_CLOUDSTORAGE": "GoogleDrive-a@x.com"}
+        subprocess.run(["bash", str(OPS / "dedup/run_dedup.sh")], env=env, capture_output=True, text=True, check=True)
+        (run,) = out.iterdir()
+        names = sorted(p.name for p in run.glob("inventory-*.csv"))
+        self.assertIn("inventory-googledrive-b-x.com.csv", names)
+        self.assertIn("inventory-onedrive-personal.csv", names)
+        self.assertNotIn("inventory-googledrive-a-x.com.csv", names)
