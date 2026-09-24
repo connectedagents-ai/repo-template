@@ -55,5 +55,8 @@ Domain models (legal matters such as Mullins, tax, CRM, voice agents) are **name
 6. **Apply.** Renames and re-tagging run from the lint report as a before→after manifest (dry run → approval → apply, with undo),
    repo renames via GitHub (redirects kept). Superseded ontology files move to `archive/` with a pointer to the canonical spec;
    duplicates (`__dup`, 4 × DEV-ONTOLOGY-INDEX, 7 × generate_ontology_graph, misfiled `zero-*` copies) go through the dedup.
+Where the ontology gets used at scale (graph, vector search, OCR + extraction + renaming pipeline, voice agents), options and
+costs are compared in `docs/research/2026-09-24_graph-vector-voice-ocr-research.md`.
+
 7. **Govern.** Changes only by PR to `global-ontology.yaml` (owner approves), semver bump, changelog. Tracked in **one** Linear
    project ("Global Ontology"), into which POW-136, POW-161 and POW-239 are moved.
