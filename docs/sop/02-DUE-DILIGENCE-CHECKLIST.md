@@ -23,6 +23,7 @@ Mark each item: ✅ verified (cite evidence) · ⚠️ finding (→ T-04) · ❓
 | B7 | Stale users, guests and external collaborators | C, A |
 | B8 | App registrations / OAuth apps with broad scopes or expired or long-lived secrets | C |
 | B9 | Personal and consumer accounts used for business (outlook.com, personal Gmail, iCloud) | D, Q |
+| B10 | **Orphaned logins:** accounts registered to an email the client can no longer receive (old company domain, lapsed mailbox) but still signed in somewhere. **P0:** add a second owner the client controls, export, then change the email or recover the domain *before the session expires* | D (browser/1Password), Q |
 
 ## C. Secrets and credentials
 | # | Check | Tool |

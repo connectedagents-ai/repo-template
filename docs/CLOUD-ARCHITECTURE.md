@@ -79,6 +79,7 @@ Status: **Active** / **Inactive** / **Unknown** · Decision: **Keep + wire** / *
 | L4 | Databricks | ? | `agent-central-config/mcp-configs/databricks-mcp.json` | Unknown | Decide | |
 | L4 | Hugging Face Spaces | ? | `hf-spaces` repo | Unknown | Decide | |
 | L5 | Notion | powerconnection.com | connector | Active | Keep + wire? (notes decision) | SSO/SCIM (plan-dependent), teamspaces by domain |
+| L5 | Notion | connectedenergyservices.com workspace/login | client: still signed in, **no access to the mailbox** | Active, at risk | **P0:** add powerconnection.com as workspace owner → export all → migrate or merge into the canonical workspace | recover the `connectedenergyservices.com` domain/mailbox (registrar + mail host), or retire it after migration |
 | L5 | Slack, Linear, HubSpot, Attio, Airtable, Stripe | ? | .env keys, plugin repos | Unknown | Decide each | SSO where available, owner, rotate keys |
 | L5 | AI tools (Claude, ChatGPT/OpenAI, Grok/xAI, Perplexity, Gemini, Copilot, Cursor, Codex, Devin, OpenRouter, Groq, DeepSeek, Mistral, Blackbox) | multiple | .env keys, user | Mixed | Keep 3–5 core. Retire the rest | SSO/team plans on core tools, exports → ai-library, rotate and revoke API keys |
 
