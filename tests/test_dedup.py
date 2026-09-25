@@ -6,7 +6,7 @@ from tests.helpers import OPS, TempDirTest
 SCAN, MERGE, APPLY = (OPS / "dedup" / n for n in ("dedup_scan.py", "dedup_merge.py", "dedup_apply.py"))
 
 
-class DedupPipelineTest(TempDirTest):
+class PlanMixin:
     def plan(self, files):
         """Write files under tmp/home, run scan + merge, return the run dir."""
         home, run = self.tmp / "home", self.tmp / "run"
@@ -20,6 +20,9 @@ class DedupPipelineTest(TempDirTest):
     def rows(self, run):
         with open(run / "duplicates.csv", newline="") as f:
             return list(csv.DictReader(f))
+
+
+class DedupPipelineTest(PlanMixin, TempDirTest):
 
     def test_legal_paths_are_never_planned_for_archive(self):
         _, run = self.plan({"a/court-filing.pdf": "x" * 50, "b/court-filing copy.pdf": "x" * 50})
@@ -88,3 +91,36 @@ class DedupPipelineTest(TempDirTest):
         self.assertEqual(self.rows(run), [])
         with open(run / "near-duplicates.csv", newline="") as f:
             self.assertEqual(len(list(csv.DictReader(f))), 2)
+
+
+class DeleteExactDuplicatesTest(PlanMixin, TempDirTest):
+    DELETE = OPS / "dedup" / "delete_exact_duplicates.py"
+
+    def test_preview_deletes_nothing_and_internal_disk_is_refused_by_default(self):
+        home, run = self.plan({"Report.pdf": "x" * 50, "Report (1).pdf": "x" * 50})
+        r = self.run_py(self.DELETE, "--plan", run / "duplicates.csv", "--apply")
+        self.assertIn("not on an external drive", r.stdout)
+        self.assertTrue((home / "Report (1).pdf").exists())
+
+    def test_apply_deletes_the_copy_keeps_the_clean_name_and_restore_brings_it_back(self):
+        home, run = self.plan({"Report.pdf": "x" * 50, "Report (1).pdf": "x" * 50})
+        r = self.run_py(self.DELETE, "--plan", run / "duplicates.csv", "--allow-internal")
+        self.assertIn("Would delete 1", r.stdout)
+        self.assertTrue((home / "Report (1).pdf").exists())
+        self.run_py(self.DELETE, "--plan", run / "duplicates.csv", "--allow-internal", "--apply")
+        self.assertFalse((home / "Report (1).pdf").exists())
+        self.assertTrue((home / "Report.pdf").exists())
+        subprocess.run(["bash", str(run / "restore.sh")], check=True)
+        self.assertEqual((home / "Report (1).pdf").read_text(), "x" * 50)
+
+    def test_a_file_changed_since_the_scan_is_left_alone(self):
+        home, run = self.plan({"Report.pdf": "x" * 50, "Report (1).pdf": "x" * 50})
+        (home / "Report (1).pdf").write_text("y" * 50)
+        r = self.run_py(self.DELETE, "--plan", run / "duplicates.csv", "--allow-internal", "--apply")
+        self.assertIn("changed since the scan", r.stdout)
+        self.assertTrue((home / "Report (1).pdf").exists())
+
+    def test_legal_duplicates_are_never_deleted(self):
+        home, run = self.plan({"court-filing.pdf": "x" * 50, "court-filing (1).pdf": "x" * 50})
+        self.run_py(self.DELETE, "--plan", run / "duplicates.csv", "--allow-internal", "--apply")
+        self.assertTrue((home / "court-filing (1).pdf").exists())
