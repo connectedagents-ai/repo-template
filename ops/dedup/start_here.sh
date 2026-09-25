@@ -52,10 +52,15 @@ case "$inc" in y|Y|yes|YES) SSD_ROOT="$SSD"; ok "The SSD will be scanned too (re
 
 CLOUD_REMOTES=""
 if command -v rclone >/dev/null 2>&1 && [ -n "$(rclone listremotes 2>/dev/null)" ]; then
-  printf '\n  Also check these connected cloud accounts (Google Drive / pCloud)? Nothing is downloaded.\n'
+  printf '\n  Also check these connected cloud accounts (Google Drive, OneDrive/SharePoint, pCloud)? Nothing is downloaded.\n'
   rclone listremotes | sed 's/^/     /'
   printf '  Include them? (y/n): '; read -r inc_cloud
-  case "$inc_cloud" in y|Y|yes|YES) CLOUD_REMOTES="$(rclone listremotes | tr '\n' ' ')"; ok "Cloud accounts included (listed through their APIs).";; esac
+  case "$inc_cloud" in
+    y|Y|yes|YES) CLOUD_REMOTES="$(rclone listremotes | tr '\n' ' ')"; ok "Cloud accounts included (listed through their APIs).";;
+    *) ok "Cloud accounts left out this time.";;
+  esac
+else
+  ok "No Google Drive / OneDrive / pCloud accounts connected (optional: bash ops/dedup/connect_cloud.sh, then run this again)."
 fi
 SKIP_CLOUDSTORAGE=""
 if [ -n "$CLOUD_REMOTES" ]; then
@@ -71,8 +76,6 @@ if [ -n "$CLOUD_REMOTES" ]; then
     done
     [ -n "$SKIP_CLOUDSTORAGE" ] && ok "Will skip (already covered by its account):$SKIP_CLOUDSTORAGE"
   fi
-else
-  ok "No Google Drive / pCloud accounts connected (optional: bash ops/dedup/connect_cloud.sh, then run this again)."
 fi
 
 say "3/5 Scanning (this can take a while — leave this window open)"
