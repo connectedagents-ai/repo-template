@@ -97,8 +97,9 @@ def add_origin(entry: dict, prov: dict):
         entry["origins"].append(prov)
 
 
-def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
-    """ChatGPT export → one Markdown file per conversation, named by conversation id. Other formats stay raw JSON."""
+def split_chatgpt(path: Path, out: Path, apply: bool, min_free_gb: float) -> int:
+    """ChatGPT export → one Markdown file per conversation, named by conversation id. Other formats stay raw JSON.
+    Raises NoRoom before a write that would eat into the reserved free space, and Stop if a write fails."""
     try:
         convs = json.loads(path.read_text(encoding="utf-8"))
     except Exception:
@@ -126,9 +127,15 @@ def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
             out.mkdir(parents=True, exist_ok=True)
             ident = slug(str(c.get("id") or c.get("conversation_id") or f"{created}-{title}"))
             dest = out / f"{created}-{slug(title)[:80]}--{ident}.md"
+            data = "\n".join(body).encode("utf-8")
+            ensure_room(out, len(data), min_free_gb)
             tmp = dest.with_name(dest.name + ".tmp")
-            tmp.write_text("\n".join(body), encoding="utf-8")
-            os.replace(tmp, dest)  # the new copy is complete before any older one is removed
+            try:
+                tmp.write_bytes(data)
+                os.replace(tmp, dest)  # the new copy is complete before any older one is removed
+            except OSError as e:
+                tmp.unlink(missing_ok=True)
+                raise Stop(f"STOP: could not write {dest}: {e}. Nothing further was copied.") from e
             for old in out.glob(f"*--{ident}.md"):  # same conversation from an earlier export, under an older title
                 if old != dest:
                     old.unlink()
@@ -136,7 +143,11 @@ def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
     return n
 
 
-class NoRoom(Exception):
+class Stop(Exception):
+    """End the run early but still write the catalog for what was already copied."""
+
+
+class NoRoom(Stop):
     pass
 
 
@@ -265,7 +276,7 @@ def main():
                     stats["duplicate"] += 1
                     add_origin(by_hash[h], prov)
                     if CHATGPT_CONVERSATIONS.fullmatch(f.name):  # same export, maybe another account: still split it here
-                        stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, chats_dir, a.apply)
+                        stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, chats_dir, a.apply, a.min_free_gb)
                     continue
                 k = kind_of(f)
                 dest = lib / "sources" / slug(a.source) / slug(a.account) / k / slug(f.name)
@@ -283,9 +294,9 @@ def main():
                     shutil.copy2(f, dest)
                     catalog[entry["path"]] = entry
                 if CHATGPT_CONVERSATIONS.fullmatch(f.name):
-                    stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, chats_dir, a.apply)
+                    stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, chats_dir, a.apply, a.min_free_gb)
 
-    except NoRoom as e:  # keep the catalog consistent with what was already copied
+    except Stop as e:  # keep the catalog consistent with what was already copied
         stopped = str(e)
 
     if a.apply:

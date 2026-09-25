@@ -78,10 +78,13 @@ def main():
     a = ap.parse_args()
 
     rows, seen_paths = [], set()
-    for inv in sorted(glob.glob(str(a.indir / "inventory-*.csv"))):
+    # newest inventory first: when scans overlap (whole account + one of its folders), a file is counted once,
+    # with the size and checksum from the most recent scan
+    newest_first = sorted(glob.glob(str(a.indir / "inventory-*.csv")), key=lambda p: (-os.path.getmtime(p), p))
+    for inv in newest_first:
         with open(inv, newline="") as f:
             for r in csv.DictReader(f):
-                if r["path"] in seen_paths:  # overlapping scans (whole account + one of its folders): count a file once
+                if r["path"] in seen_paths:
                     continue
                 seen_paths.add(r["path"])
                 r["size"], r["mtime"] = int(r["size"]), int(r["mtime"])

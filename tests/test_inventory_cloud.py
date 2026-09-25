@@ -30,3 +30,15 @@ class InventoryCloudTest(TempDirTest):
         r, report = self.inventory(INCLUDE_1PASSWORD="0")
         self.assertEqual(r.returncode, 1)
         self.assertIn("(failed: gh", report)
+
+    def test_1password_is_skipped_by_default(self):
+        self.tool("op", 'echo "op called" >> "$(dirname "$0")/op.log"; echo "[]"')
+        r, report = self.inventory()
+        self.assertIn("consent was not given", report)
+        self.assertFalse((self.tmp / "bin/op.log").exists())
+
+    def test_a_failed_vault_enumeration_is_reported(self):
+        self.tool("op", 'case "$*" in "vault list --format json") exit 1;; esac; echo ok')
+        r, report = self.inventory(INCLUDE_1PASSWORD="1")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("could not list vault IDs", report)

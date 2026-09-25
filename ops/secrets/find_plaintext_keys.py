@@ -16,7 +16,8 @@ HOME = Path.home()
 NAME = r"[A-Za-z0-9_.-]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PAT(?![A-Za-z]))[A-Za-z0-9_.-]*"
 # NAME=value · export NAME=value · NAME = "value" (TOML) · "name": "value" (JSON)
 # The value is the whole quoted string when quoted ("correct horse battery staple"), else up to whitespace/#/,
-VALUE = r"""(?:"([^"]*)"|'([^']*)'|([^"'\s#,]+))"""
+# (backslash-escaped quotes stay inside the value: "ab\"cd")
+VALUE = r"""(?:"((?:[^"\\]|\\.)*)"|'((?:[^'\\]|\\.)*)'|([^"'\s#,]+))"""
 ASSIGN = re.compile(rf"""^\s*(?:export\s+)?["']?({NAME})["']?\s*[:=]\s*{VALUE}""", re.I)
 # .npmrc registry auth: //registry.npmjs.org/:_authToken=value
 NPMRC = re.compile(rf"^\s*(//[^\s=]+:(?:_authToken|_auth|_password))\s*=\s*{VALUE}")
@@ -59,13 +60,21 @@ def is_plaintext(value):
 
 def git_status(path, value):
     """'committed' if this value is in the file's git history, 'tracked' if git tracks the file, else ''.
-    The value is only passed to git in-process; it is never printed or logged."""
+    The value never goes into a git command line (other local users can read process arguments): git hands back
+    every committed version of the file, merge resolutions included, and the search happens here."""
     d, name = str(path.parent), path.name
-    if subprocess.run(["git", "-C", d, "ls-files", "--error-unmatch", "--", name], capture_output=True).returncode != 0:
+    tracked = subprocess.run(["git", "-C", d, "ls-files", "--full-name", "--error-unmatch", "--", name],
+                             capture_output=True, text=True)
+    if tracked.returncode != 0:
         return ""
-    hist = subprocess.run(["git", "-C", d, "log", "--all", "--format=%H", "-S", value, "--", name],
-                          capture_output=True, text=True)
-    return "committed" if hist.stdout.strip() else "tracked"
+    repo_path = tracked.stdout.splitlines()[0]
+    commits = subprocess.run(["git", "-C", d, "log", "--all", "--full-history", "-m", "--format=%H", "--", name],
+                             capture_output=True, text=True).stdout.split()
+    if not commits:
+        return "tracked"
+    wanted = "".join(f"{c}:{repo_path}\n" for c in dict.fromkeys(commits)).encode()
+    blobs = subprocess.run(["git", "-C", d, "cat-file", "--batch"], input=wanted, capture_output=True).stdout
+    return "committed" if value.encode() in blobs else "tracked"
 
 
 def scan_file(path):

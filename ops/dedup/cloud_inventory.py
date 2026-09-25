@@ -11,7 +11,7 @@ with each other and with local files. Google Docs/Sheets/Slides and Drive shortc
 not real copies). Legal-looking paths are flagged like dedup_scan.py.
 One-time setup: see connect_cloud.sh.
 """
-import argparse, csv, datetime, json, re, subprocess, sys
+import argparse, csv, datetime, hashlib, json, re, subprocess, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -78,7 +78,12 @@ def main():
         a.remote += ":"
     name = a.remote.split(":", 1)[0]
     surface = re.sub(r"[^A-Za-z0-9._-]", "_", name)
-    slug = re.sub(r"[^A-Za-z0-9._-]", "_", a.remote.rstrip(":/"))  # one file per remote+folder, so scans don't overwrite
+    # one file per remote+folder, so scans don't overwrite each other. A folder scan also gets a digest of the exact
+    # remote+folder, because "sp-legal:Client A" and "sp-legal:Client_A" clean up to the same name.
+    target = a.remote.rstrip(":/")
+    slug = re.sub(r"[^A-Za-z0-9._-]", "_", target)
+    if slug != target:
+        slug += "-" + hashlib.sha1(target.encode()).hexdigest()[:8]
     prefix = a.remote if a.remote.endswith((":", "/")) else a.remote + "/"
     legal = re.compile(a.legal_pattern, re.I)
     a.out.mkdir(parents=True, exist_ok=True)

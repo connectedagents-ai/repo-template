@@ -73,3 +73,30 @@ class FindPlaintextKeysTest(TempDirTest):
         r = self.run_py(FIND, "--no-defaults", d, check=False)
         self.assertEqual(r.returncode, 2)
         self.assertIn("INCOMPLETE", r.stdout)
+
+    def test_escaped_quotes_stay_inside_the_value(self):
+        rc = self.tmp / ".zshrc"
+        rc.write_text('export DB_PASSWORD="ab\\"cdefghijk"\n')
+        self.assertIn("DB_PASSWORD", self.run_py(FIND, "--no-defaults", rc).stdout)
+
+    def test_key_first_added_by_a_merge_resolution_is_in_git_history(self):
+        repo = self.tmp / "repo"
+        repo.mkdir()
+        git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run(["git", "init", "-q", "-b", "main", str(repo)], check=True)
+        env = repo / ".env"
+        env.write_text("MODE=base\n")
+        subprocess.run(git + ["add", ".env"], check=True)
+        subprocess.run(git + ["commit", "-qm", "base"], check=True)
+        subprocess.run(git + ["checkout", "-qb", "side"], check=True)
+        env.write_text("MODE=side\n")
+        subprocess.run(git + ["commit", "-qam", "side"], check=True)
+        subprocess.run(git + ["checkout", "-q", "main"], check=True)
+        env.write_text("MODE=main\n")
+        subprocess.run(git + ["commit", "-qam", "main"], check=True)
+        subprocess.run(git + ["merge", "-q", "side"], capture_output=True)
+        env.write_text("MODE=merged\nXAI_API_KEY=fake-xai-merge-value-7\n")
+        subprocess.run(git + ["commit", "-qam", "merge"], check=True)
+        r = self.run_py(FIND, "--no-defaults", repo, check=False)
+        self.assertEqual(r.returncode, 1, r.stdout)
+        self.assertIn("IN GIT HISTORY", r.stdout)

@@ -26,11 +26,42 @@ to SharePoint via rclone: In Progress), POW-153 (SharePoint bookkeeping sites), 
    compared by Microsoft's own checksum (QuickXorHash), so nothing downloads. Legal-looking paths are flagged and never moved.
    Result: `PLAN.md` with what exists only in netzerolending / the personal OneDrive, and what is already duplicated elsewhere.
 4. **Migrate what exists only in the old tenant / personal OneDrive** to the target chosen in D2 (Google Drive or the
-   OneWish Labs SharePoint), as a **copy** (never a move), server-to-server with rclone:
-   set the target remote once, e.g. `TARGET=sp-centralfilecloud` (or `gdrive-powerconnection`), then
-   `rclone copy onedrive-netzerolending: "${TARGET}:Archive/netzerolending" --dry-run` → review → run without `--dry-run`
-   → `rclone check onedrive-netzerolending: "${TARGET}:Archive/netzerolending" --one-way` must report 0 differences.
-   Privileged legal material goes to the litigation evidence store instead (with counsel), per MIGRATION-PLAN step 0.
+   OneWish Labs SharePoint), as a **copy** (never a move), using only an **approved file list**, never the whole account:
+   - Build the candidate list from the step 3 run folder (`<run>`): files in the old tenant that have no copy anywhere
+     else (one copy when the only duplicates are inside the old tenant) and are **not** flagged legal:
+     ```bash
+     python3 - <run> onedrive-netzerolending > ~/migrate-netzerolending.txt <<'PY'
+     import csv, glob, sys
+     from collections import defaultdict
+     run, remote = sys.argv[1], sys.argv[2]
+     groups, group_of = defaultdict(list), {}
+     for r in csv.DictReader(open(f"{run}/duplicates.csv")):
+         groups[r["group"]].append(r["path"]); group_of[r["path"]] = r["group"]
+     copied = set()  # one copy per duplicate group; skip groups that already have a copy outside this account
+     for inv in glob.glob(f"{run}/inventory-{remote}*.csv"):
+         for r in csv.DictReader(open(inv)):
+             g = group_of.get(r["path"])
+             if r["legal"] != "0" or g in copied:
+                 continue
+             if g and any(not p.startswith(remote + ":") for p in groups[g]):
+                 continue
+             if g:
+                 copied.add(g)
+             print(r["path"].split(":", 1)[1])
+     PY
+     ```
+   - **Review the list** and delete any line that should not move (anything privileged or client-confidential). That
+     reviewed file is the approved set.
+   - Set the target remote once, e.g. `TARGET=sp-centralfilecloud` (or `gdrive-powerconnection`), then
+     `rclone copy onedrive-netzerolending: "${TARGET}:Archive/netzerolending" --files-from ~/migrate-netzerolending.txt --dry-run`
+     → review → run without `--dry-run` →
+     `rclone check onedrive-netzerolending: "${TARGET}:Archive/netzerolending" --files-from ~/migrate-netzerolending.txt --one-way`
+     must report 0 differences.
+   - This is **not** a server-to-server copy: OneDrive → Google Drive or → another tenant are different accounts, so
+     rclone streams each file through the machine running it (network traffic, not stored on its disk). Run it on a
+     fast connection, or on a cloud VM for large sets.
+   - Privileged legal material is excluded from this list on purpose. It goes to the litigation evidence store instead
+     (with counsel), per MIGRATION-PLAN step 0.
 5. **Retire the source** only after step 4 checks clean: make it read-only for 30 days, then follow
    `ops/domains/DOMAIN-CONSOLIDATION.md` (M365 domain removal order) for netzerolending.io. The personal Microsoft account
    can simply stay as a read-only archive.

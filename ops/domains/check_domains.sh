@@ -33,10 +33,13 @@ for d in "$@"; do
     if [ "$rc" -ne 0 ]; then echo "  web       : $u  ⚠ REQUEST FAILED (curl exit $rc): $res"
     else
       code="${res%% *}"; target="${res#* }"
+      scheme="$(printf '%s' "$target" | sed -nE 's#^([a-zA-Z]+)://.*#\1#p' | tr 'A-Z' 'a-z')"
       host="$(printf '%s' "$target" | sed -E 's#^[a-zA-Z]+://([^/:?#]+).*#\1#' | tr 'A-Z' 'a-z')"
-      case "$code:$host" in
-        301:powerconnection.com|301:www.powerconnection.com) flag="✅ permanent redirect";;
-        30[278]:powerconnection.com|30[278]:www.powerconnection.com) flag="⚠ $code is temporary: use 301";;
+      case "$code:$scheme:$host" in
+        301:https:powerconnection.com|301:https:www.powerconnection.com) flag="✅ permanent redirect";;
+        308:https:powerconnection.com|308:https:www.powerconnection.com) flag="⚠ 308 is permanent, but this runbook uses 301 (older clients handle it best)";;
+        30[1278]:http:powerconnection.com|30[1278]:http:www.powerconnection.com) flag="⚠ redirects over plain http: point it at https://";;
+        30[27]:https:powerconnection.com|30[27]:https:www.powerconnection.com) flag="⚠ $code is temporary: use 301";;
         30?:*) flag="↪ redirects elsewhere ($host), not to powerconnection.com";;
         *) flag="";;
       esac

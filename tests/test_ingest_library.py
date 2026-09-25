@@ -95,3 +95,31 @@ class IngestLibraryTest(TempDirTest):
         self.exp.mkdir()
         r = self.run_py(INGEST, "--source", "x", "--library", self.tmp / "repo/lib", self.exp, check=False)
         self.assertIn("refusing", r.stderr)
+
+
+class SplitChatgptTest(TempDirTest):
+    def setUp(self):
+        super().setUp()
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("ingest_library", INGEST)
+        self.il = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(self.il)
+        self.export = self.tmp / "conversations.json"
+        self.export.write_text(chatgpt_export([("c1", "Plan", "hi")]), encoding="utf-8")
+        self.out = self.tmp / "chats"
+
+    def test_split_chats_respect_the_free_space_limit(self):
+        with self.assertRaises(self.il.NoRoom):
+            self.il.split_chatgpt(self.export, self.out, True, 10**6)
+        self.assertEqual(list(self.out.glob("*")), [])
+
+    def test_a_failed_write_leaves_no_partial_file(self):
+        from unittest import mock
+        real = self.il.Path.write_bytes
+
+        def half_write(p, data):
+            real(p, data[:3])
+            raise OSError("disk error")
+        with mock.patch.object(self.il.Path, "write_bytes", half_write), self.assertRaises(self.il.Stop):
+            self.il.split_chatgpt(self.export, self.out, True, 0)
+        self.assertEqual(list(self.out.glob("*")), [])

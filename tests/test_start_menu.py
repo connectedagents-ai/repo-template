@@ -19,3 +19,10 @@ class StartMenuTest(TempDirTest):
         r = self.choice("2")
         self.assertEqual(r.returncode, 0)
         self.assertIn("OPENAI_API_KEY", r.stdout)
+
+    def test_a_report_that_cannot_be_saved_is_a_failure(self):
+        (self.tmp / "ops-reports").write_text("a file where the report folder should go")
+        r = self.choice("1")
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("Could not create the report folder", r.stdout)
+        self.assertNotIn("Saved:", r.stdout)

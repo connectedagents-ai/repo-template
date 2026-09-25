@@ -111,7 +111,8 @@ def tenant_of(host):
     return None
 
 
-def read_sqlite(path, query):
+def read_sqlite(path, query, required=False):
+    """Rows, or [] if the database can't be read. required=True raises instead, for sources a report can't skip."""
     tmp = Path(tempfile.mkdtemp()) / "db"
     try:
         shutil.copy2(path, tmp)
@@ -124,6 +125,8 @@ def read_sqlite(path, query):
         return rows
     except Exception as e:  # locked, permission (needs Full Disk Access), schema change
         print(f"  skip {path}: {e}")
+        if required:
+            raise
         return []
     finally:
         shutil.rmtree(tmp.parent, ignore_errors=True)
@@ -197,18 +200,23 @@ def in_scope(user, allowed):
 
 
 def apple_mail(hit, allowed):
-    """Metadata from Mail.app's Envelope Index: accounts, platform senders, alert subjects. allowed=None means all accounts."""
+    """Metadata from Mail.app's Envelope Index: accounts, platform senders, alert subjects. allowed=None means all accounts.
+    Returns (account rows, alerts, accounts map, unresolved mailbox ids, read_failed)."""
     idx = sorted(glob.glob(str(HOME / "Library/Mail/V*/MailData/Envelope Index")),
                  key=lambda p: int(re.search(r"/V(\d+)/", p).group(1)) if re.search(r"/V(\d+)/", p) else 0)
     accounts = mail_accounts_map()
     acct_rows, alerts, unresolved = {}, [], set()
     if not idx:
         print("  Apple Mail: no Envelope Index (Mail not used, or Terminal lacks Full Disk Access)")
-        return acct_rows, alerts, accounts, unresolved
+        return acct_rows, alerts, accounts, unresolved, False
     q = ("SELECT mb.url, a.address, s.subject, m.date_received FROM messages m "
          "JOIN mailboxes mb ON m.mailbox = mb.ROWID LEFT JOIN addresses a ON m.sender = a.ROWID "
          "LEFT JOIN subjects s ON m.subject = s.ROWID")
-    for url, sender, subject, received in read_sqlite(idx[-1], q):
+    try:
+        messages = read_sqlite(idx[-1], q, required=True)
+    except Exception:
+        return acct_rows, alerts, accounts, unresolved, True
+    for url, sender, subject, received in messages:
         acct_id = urlparse(url or "").netloc
         if allowed is not None and acct_id not in accounts:
             unresolved.add(acct_id)  # can't tell whose mailbox this is, so it can't be matched to Schedule A
@@ -227,7 +235,7 @@ def apple_mail(hit, allowed):
         is_bounce = domain.startswith(("mailer-daemon", "postmaster")) or (sender or "").lower().startswith(("mailer-daemon", "postmaster"))
         if (c or is_bounce) and subject and ALERT.search(subject):
             alerts.append([ts.strftime("%Y-%m-%d"), user, domain, subject[:160]])
-    return acct_rows, alerts, accounts, unresolved
+    return acct_rows, alerts, accounts, unresolved, False
 
 
 def main():
@@ -292,9 +300,9 @@ def main():
         except Exception as e:
             print(f"  skip 1Password: {e} (sign in with `op signin`)")
 
-    mail_rows, mail_alerts, sys_accounts, unresolved = {}, [], {}, set()
+    mail_rows, mail_alerts, sys_accounts, unresolved, mail_failed = {}, [], {}, set(), False
     if a.consent_4b and (mail_allowed is None or mail_allowed):
-        mail_rows, mail_alerts, sys_accounts, unresolved = apple_mail(hit, mail_allowed)
+        mail_rows, mail_alerts, sys_accounts, unresolved, mail_failed = apple_mail(hit, mail_allowed)
     elif a.consent_4b:
         print("  Apple Mail: no --mail-accounts given (Schedule A), skipped")
 
@@ -348,9 +356,14 @@ def main():
         w.writerows(sorted(mail_alerts, reverse=True))
     print(f"  mail accounts: {len(mail_rows)} · mail alerts: {len(mail_alerts)}")
     print(f"  platforms: {len(plat)} · AI projects: {len(projects)} · bookmarks: {n_bm} · 1Password items: {len(op_rows)}")
-    if unresolved:  # the caller marks the bundle incomplete on a non-zero exit
+    # the caller marks the bundle incomplete on a non-zero exit
+    if mail_failed:
+        print("  ⚠ Apple Mail: the Envelope Index could not be read, so NO mail was checked against Schedule A. "
+              "Grant Terminal Full Disk Access (or quit Mail) and re-run.")
+    if unresolved:
         print(f"  ⚠ Apple Mail: {len(unresolved)} mailbox account(s) could not be identified (macOS Internet Accounts unreadable?), "
               "so their messages were NOT checked against Schedule A. Grant Full Disk Access and re-run.")
+    if mail_failed or unresolved:
         sys.exit(3)
 
 

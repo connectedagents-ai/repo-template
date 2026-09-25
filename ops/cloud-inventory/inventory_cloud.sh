@@ -4,8 +4,9 @@
 # Uses whichever CLIs are installed and logged in; skips the rest. Changes nothing.
 # Writes ~/cloud-inventory-YYYYMMDD-HHMMSS.md  (feed it into docs/CLOUD-ARCHITECTURE.md §3)
 #
-#   bash inventory_cloud.sh
-#   INCLUDE_1PASSWORD=0 bash inventory_cloud.sh   # skip 1Password (client discovery passes this unless clause 4b is consented)
+#   bash inventory_cloud.sh                        # 1Password is skipped unless you opt in
+#   INCLUDE_1PASSWORD=1 bash inventory_cloud.sh    # also list 1Password accounts, vaults and vault sharing (names only)
+# 1Password is a clause 4b source: client discovery sets INCLUDE_1PASSWORD=1 only when 4b is consented.
 # Exits 1 if any command that ran failed (the report is still written, with "(failed: …)" markers).
 #
 # Logins (once): az login --allow-no-subscriptions · gcloud auth login · gh auth login · vercel login · wrangler login · op signin
@@ -77,16 +78,24 @@ out "## L4 · Cloudflare"
 if have wrangler; then run wrangler whoami; run wrangler pages project list; fi
 
 out "## L0 · 1Password (names only, never values)"
-if [ "${INCLUDE_1PASSWORD:-1}" != 1 ]; then
-  out "_skipped: 1Password is a clause 4b source and consent was not given_"
+if [ "${INCLUDE_1PASSWORD:-0}" != 1 ]; then
+  out "_skipped: 1Password is a clause 4b source and consent was not given (set INCLUDE_1PASSWORD=1 to include it)_"
 elif have op; then
   run op account list
   run op vault list
   out "Vault sharing (who can open each vault: look for bots and broad shares):"
-  for v in $(op vault list --format json 2>/dev/null | python3 -c 'import json,sys;[print(x["id"]) for x in json.load(sys.stdin)]' 2>/dev/null); do
-    out "### vault $(op vault get "$v" --format json 2>/dev/null | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("name"), "·", d.get("items", "?"), "items")' 2>/dev/null)"
-    run op vault user list "$v"
-  done
+  if vaults="$(op vault list --format json 2>/dev/null | python3 -c 'import json,sys;[print(x["id"]) for x in json.load(sys.stdin)]' 2>/dev/null)"; then
+    for v in $vaults; do
+      if name="$(op vault get "$v" --format json 2>/dev/null | python3 -c 'import json,sys;d=json.load(sys.stdin);print(d.get("name"), "·", d.get("items", "?"), "items")' 2>/dev/null)"; then
+        out "### vault $name"
+      else
+        out "### vault $v"; out "(failed: op vault get $v)"; FAILED=1
+      fi
+      run op vault user list "$v"
+    done
+  else
+    out "(failed: could not list vault IDs for the sharing check)"; FAILED=1
+  fi
 fi
 
 echo "Inventory written: $OUT"

@@ -17,7 +17,7 @@
   - Grok Business ($30/seat) has SharePoint/OneDrive connectors.
   - Collections is a good RAG index but **not** a canonical evidence store: 100k-file / 100 GB caps, and no documented legal hold.
   - The Grok Voice Agent ($0.08/min, ~0.7 s to first audio) queries the graph through function tools. Its BAA status is unconfirmed.
-- **Voice (medical):** the BAA is what decides the platform. Vapi charges a +$2k/mo HIPAA add-on, LiveKit requires the $500/mo Scale plan, and Retell/ElevenLabs/Bland put the BAA behind Enterprise. Realtime *audio* BAA coverage is **disputed**: one source (May 2026) says OpenAI/Azure realtime audio is not covered, while OpenAI's HIPAA-eligible list (help.openai.com article 20001069, cited in review, not re-verified here) reportedly includes `/v1/realtime` with an executed BAA and Modified Retention. Confirm with OpenAI in writing; until then STT → text LLM → TTS is the safe default. Azure is assessed separately [i10].
+- **Voice (medical):** the BAA is what decides the platform. Vapi charges a +$2k/mo HIPAA add-on, LiveKit requires the $500/mo Scale plan, and Retell/ElevenLabs/Bland put the BAA behind Enterprise. **OpenAI Realtime is conditionally eligible now:** OpenAI's HIPAA-eligible list [i11] includes `/v1/realtime` when the organization has an **executed BAA and Modified Retention** (a May 2026 guide [i6] said realtime audio was not covered; treat that as historical). Get both in place, in writing, before any PHI; without them, STT → text LLM → TTS remains the safe default. Azure OpenAI realtime is assessed separately and is not covered [i10].
 
 ---
 
@@ -107,7 +107,7 @@ Design implications:
 | **ElevenLabs Agents** | ~$0.08/min overage + LLM + telephony billed separately; plan bundles (price cut May 2026) [i4] | Native KB with RAG index; tools; MCP (UNVERIFIED) | BAA **Enterprise only**, with Zero Retention Mode [i4] |
 | **LiveKit Agents** (OSS framework + Cloud) | Cloud agent-session $0.01/min over quota; plans Build free / Ship $50 / **Scale $500** [i5] | You code RAG/tools yourself (Python/Node). Plugins for OpenAI, xAI, Deepgram etc. | **BAA on Scale ($500/mo) and Enterprise** [i5] |
 | **Pipecat** (OSS) / Pipecat Cloud (Daily) | From $0.01/agent-min [i5] | Code-first pipeline, any retriever | Pipecat Cloud says HIPAA-compliant (BAA terms UNVERIFIED) [i5] |
-| **OpenAI Realtime API** | gpt-realtime: $32/M audio in, $64/M audio out (≈$0.02/min in, ~$0.08/min out); mini $10/$20 [i6] | Function calling, remote MCP; no built-in KB | BAA coverage **disputed / UNVERIFIED**: [i6] (May 2026) says realtime audio is not covered; OpenAI's HIPAA-eligible list reportedly includes `/v1/realtime` with a BAA + Modified Retention (help.openai.com 20001069, not re-verified). Azure OpenAI realtime: not covered per [i10] |
+| **OpenAI Realtime API** | gpt-realtime: $32/M audio in, $64/M audio out (≈$0.02/min in, ~$0.08/min out); mini $10/$20 [i6] | Function calling, remote MCP; no built-in KB | **HIPAA-eligible with an executed BAA + Modified Retention** [i11] (the May 2026 "not covered" statement in [i6] is historical) |
 | **xAI Grok Voice Agent API** | grok-voice-think-fast-2.0 **$0.08/audio-min** (v1.0 $0.05, deprecated) [i7] | OpenAI-Realtime-compatible; LiveKit plugin; tools, web/X search | No BAA found (UNVERIFIED): treat as non-HIPAA |
 | **Deepgram Voice Agent API** | ~$0.075/min bundled ($4.50/hr); $0.05–0.16/min depending on BYO LLM/TTS [i8] | Function calling; BYO LLM | BAA via enterprise sales (UNVERIFIED terms) [i8] |
 | **Azure Voice Live / Azure AI Speech** | Voice Live Pro: $4.40/M text in, $17/M audio in; Standard/Lite $15/M audio; BYO-model $12.50/$30 per M [i9] | Foundry agents, Azure AI Search grounding, tools | **Azure Speech STT/TTS are HIPAA-covered.** GPT-realtime audio path is **not** covered [i10]. Voice Live coverage UNVERIFIED |
@@ -295,10 +295,10 @@ These leave the tenant: xAI, OpenAI direct, Elastic Cloud, Reducto, LlamaParse, 
 | ChatGPT Free/Plus/Pro | Plus ~$20; Pro $100 / $200 tiers [n7] | Projects, file uploads, deep research, custom GPTs, connectors (per-tier availability UNVERIFIED) | **Trains by default** unless "Improve the model for everyone" is off. Temporary chats deleted after 30 days [n7]. **Not for privileged material** (see *Heppner* [k1]) |
 | **ChatGPT Business** (ex-Team) | **$20/seat/mo annual, $25 monthly, 2-seat min** (cut 2026-04-02) [n8] | Shared projects, connectors incl. SharePoint/Drive, deep research, GPTs | **No training by default** [n8] |
 | **ChatGPT Enterprise** | Quote. Reported ~$45–75/seat, ~150-seat minimum [n8] | Synced SharePoint connector (**US data residency only**), SSO/SCIM, compliance export, **Microsoft Purview integration for ChatGPT Enterprise** (audit/DLP/eDiscovery) [n8][n9] | No training. Custom retention ≥90 days. Data residency options [n8] |
-| **OpenAI API** — models | GPT-6 Astra $10/$50. **GPT-5.6 Sol $5/$30, Terra $2/$12, Luna $0.20/$1.20** per 1M in/out. **Batch −50%**, cached input 10% [n6] | Responses API, structured outputs, vision (OCR), tools, remote MCP | No training by default. 30-day abuse retention unless ZDR. **ZDR for eligible customers**. BAA covers ZDR-eligible endpoints only (chat/responses) [k3]. NYT blanket preservation order ended 2025-09-26 [n7] |
+| **OpenAI API** — models | GPT-6 Astra $10/$50. **GPT-5.6 Sol $5/$30, Terra $2/$12, Luna $0.20/$1.20** per 1M in/out. **Batch −50%**, cached input 10% [n6] | Responses API, structured outputs, vision (OCR), tools, remote MCP | No training by default. 30-day abuse retention unless ZDR. **ZDR for eligible customers**. BAA covers the HIPAA-eligible endpoints: chat/responses with ZDR [k3], and `/v1/realtime` with an executed BAA + Modified Retention [i11]. NYT blanket preservation order ended 2025-09-26 [n7] |
 | OpenAI API — `file_search` / vector stores | **$0.10/GB-day (first 1 GB free) + $2.50 per 1k tool calls** [n5] | Managed chunk/embed/hybrid search | Stored until deleted. ZDR-compatibility of stored files UNVERIFIED |
 | OpenAI API — embeddings | 3-small $0.02, 3-large $0.13 per 1M (batch −50%) [f1] | | |
-| OpenAI API — Realtime voice | gpt-realtime $32/$64 per 1M audio tok (~$0.02 in / ~$0.08 out per min); mini $10/$20 [i6] | Function calling, MCP | BAA coverage disputed (see §3b row); confirm with OpenAI before PHI |
+| OpenAI API — Realtime voice | gpt-realtime $32/$64 per 1M audio tok (~$0.02 in / ~$0.08 out per min); mini $10/$20 [i6] | Function calling, MCP | HIPAA-eligible with an executed BAA + Modified Retention [i11]; Azure OpenAI realtime is separate and not covered [i10] |
 
 ### 8b. xAI / Grok (user priority)
 
@@ -397,6 +397,7 @@ These leave the tenant: xAI, OpenAI direct, Elastic Cloud, Reducto, LlamaParse, 
 - [i8] https://deepgram.com/pricing ; https://diyai.io/ai-tools/speech-to-text/deepgram-pricing-2026/ (2026-09-24)
 - [i9] https://techcommunity.microsoft.com/blog/azure-ai-foundry-blog/azure-ai-voice-live-api-what%E2%80%99s-new-and-the-pricing-announcement/4428687 (2026-09-24)
 - [i10] https://learn.microsoft.com/en-us/answers/questions/5598862/is-the-gpt-realtime-model-in-azure-covered-under-b (2026-09-24)
+- [i11] https://help.openai.com/en/articles/20001069-hipaa-eligible-products-and-functionality (cited in PR review 2026-09-25; the page was not reachable from the drafting environment, so confirm it when signing the BAA)
 
 **Microsoft**
 - [j1] https://alphavima.com/blog/microsoft-365-copilot-pricing/ ; https://www.explainx.ai/blog/microsoft-365-copilot-pricing-licensing-2026 (2026-09-24)

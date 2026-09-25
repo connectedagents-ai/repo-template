@@ -159,6 +159,31 @@ class InventoryFilesTest(TempDirTest):
         self.assertEqual(paths, ["sp-legal:Archive/old/a.pdf", "sp-legal:Shared Documents/a.pdf"])
 
 
+    def test_folders_that_clean_up_to_the_same_name_keep_separate_files(self):
+        run = self.tmp / "run"
+        for folder, name in (("Client A", "a.pdf"), ("Client_A", "b.pdf")):
+            listing = self.tmp / f"{name}.json"
+            listing.write_text(lsjson([{"Path": name, "Size": 9, "ModTime": "2025-01-01T00:00:00Z", "Hashes": {"md5": name}}]))
+            self.run_py(CLOUD_INV, "--remote", f"sp-legal:{folder}", "--from-json", listing, "--out", run)
+        self.assertEqual(len(list(run.glob("inventory-sp-legal_Client_A-*.csv"))), 2)
+
+    def test_the_newest_scan_wins_when_scans_overlap(self):
+        run = self.tmp / "run"
+        old = self.tmp / "old.json"
+        old.write_text(lsjson([{"Path": "Docs/a.pdf", "Size": 9, "ModTime": "2025-01-01T00:00:00Z", "Hashes": {"md5": "stale"}}]))
+        new = self.tmp / "new.json"
+        new.write_text(lsjson([{"Path": "a.pdf", "Size": 9, "ModTime": "2025-01-01T00:00:00Z", "Hashes": {"md5": "fresh"}},
+                               {"Path": "b.pdf", "Size": 9, "ModTime": "2025-01-01T00:00:00Z", "Hashes": {"md5": "fresh"}}]))
+        self.run_py(CLOUD_INV, "--remote", "sp-legal:", "--from-json", old, "--out", run)
+        self.run_py(CLOUD_INV, "--remote", "sp-legal:Docs", "--from-json", new, "--out", run)
+        (whole,) = run.glob("inventory-sp-legal.csv")
+        os.utime(whole, (1, 1))  # the whole-account scan is older, though its name sorts first
+        self.run_py(MERGE, "--in", run)
+        with open(run / "duplicates.csv", newline="") as f:
+            paths = sorted(r["path"] for r in csv.DictReader(f))
+        self.assertEqual(paths, ["sp-legal:Docs/a.pdf", "sp-legal:Docs/b.pdf"])
+
+
 class QuickXorHashTest(TempDirTest):
     """Reference values produced by `rclone hashsum quickxor` (rclone v1.71.1)."""
 

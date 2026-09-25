@@ -31,9 +31,12 @@ The keys found in `agent-central-config/.env` and SharePoint `gemini-api.md` mus
 3. Copy the token. It's shown once, so save it into 1Password itself as well (e.g. `Employee/claude-code-cloud service account`).
 4. claude.ai/code → this session's title bar → the cloud **environment menu → Edit**:
    - **Environment variables / API credentials:** add `OP_SERVICE_ACCOUNT_TOKEN` = the token. **Never paste it into chat.**
-   - **Network access:** allow `*.1password.com`, `*.1password.ca`, `*.1password.eu`, `cache.agilebits.com` (the CLI download) and
-     `keyserver.ubuntu.com` (the signing key used to verify that download), or pick a broader access level. Without the key server
-     the setup script stops before installing, because it refuses an unverified binary.
+   - **Network access:** choose **Custom** and allow only `*.1password.com`, `*.1password.ca`, `*.1password.eu`,
+     `cache.agilebits.com` (the CLI download) and `keyserver.ubuntu.com` (the signing key used to verify that download), plus
+     the hosts your task itself needs (e.g. `github.com`). **Don't use Trusted or Full access in an environment that holds the token:**
+     every command in the session can read environment variables, so unrestricted network access would let untrusted code
+     send the token anywhere. Without the key server the setup script stops before installing, because it refuses an
+     unverified binary.
    - **Setup script:** add `bash ops/1password/install-op-cli.sh` (or paste its contents).
 5. Start a new session. Claude checks `op whoami` → `op vault list`, which should show only the granted vaults.
 6. Rotate the service-account token every 90 days (set an expiry when you create it) and review its usage in 1Password's activity log.

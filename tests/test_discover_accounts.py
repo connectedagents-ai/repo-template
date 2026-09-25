@@ -31,8 +31,17 @@ class AppleMailScopeTest(unittest.TestCase):
                 mock.patch.object(discover, "mail_accounts_map",
                                   return_value={"ACC1": ("me@icloud.com", "iCloud"), "ACC2": ("other@x.com", "IMAP")}), \
                 mock.patch.object(discover, "read_sqlite", return_value=rows):
-            acct_rows, alerts, _, unresolved = discover.apple_mail(lambda *a, **k: hits.append(a), {"me@icloud.com"})
+            acct_rows, alerts, _, unresolved, failed = discover.apple_mail(lambda *a, **k: hits.append(a), {"me@icloud.com"})
         self.assertEqual(set(acct_rows), {"me@icloud.com"})
         self.assertEqual([a[1] for a in alerts], ["me@icloud.com"])
         self.assertEqual(len(hits), 1)
         self.assertEqual(unresolved, {"UNKNOWN"})
+        self.assertFalse(failed)
+
+    def test_an_unreadable_envelope_index_is_a_failure_not_an_empty_mailbox(self):
+        with mock.patch.object(discover.glob, "glob", return_value=["/x/V10/MailData/Envelope Index"]), \
+                mock.patch.object(discover, "mail_accounts_map", return_value={}), \
+                mock.patch.object(discover.shutil, "copy2", side_effect=PermissionError("Operation not permitted")):
+            acct_rows, alerts, _, unresolved, failed = discover.apple_mail(lambda *a, **k: None, None)
+        self.assertTrue(failed)
+        self.assertEqual((acct_rows, alerts, unresolved), ({}, [], set()))
