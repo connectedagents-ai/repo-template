@@ -17,7 +17,7 @@ files out of code repos.
 - `agent-central-config` has live keys and about 173 MB of case files **in its git history**, so it must never be copied with its history.
 
 ## 2. The new org
-- **Name:** `powerconnection` (it matches powerconnection.com and the Linear workspace). Alternatives if taken: `powerconnection-ai`, `pwrconnection`.
+- **Name:** `powerconnectionai`, display name "Power Connection" (created 2026-09-25 on the Team plan): **https://github.com/powerconnectionai**
   Created by you on github.com (GitHub doesn't let apps or agents create orgs).
 - **Private by default.** Public only on purpose (e.g. an open-source package or a marketing site).
 - Settings: `ops/github-setup/configure_github.sh` applies everything the API can set (members, Actions, security, the
@@ -62,7 +62,7 @@ Once a repo's contents are in the new org, archive the old repo. When both old o
 |---|---|---|---|
 | 1 | You | Create the org at github.com/account/organizations/new (Free is fine to start; Team if you want required reviewers on private repos) | the org exists |
 | 2 | You | Install the **Claude GitHub App** on the new org (github.com/apps/claude → Configure → *All repositories*). Also Linear, and **one** review bot (CodeRabbit or Cursor Bugbot, not both: two bots doubled the review noise on PR #1) | the app shows the org |
-| 3 | You | Run `bash ops/github-setup/configure_github.sh <ORG>` (preview), then with `--apply --create-repos`; tick `docs/GITHUB-SETUP.md` §2–§5 | the script ends with no FAIL lines, or only plan-limited ones you accept |
+| 3 | You | Run `bash ops/github-setup/configure_github.sh powerconnectionai` (preview), then with `--apply --create-repos`; tick `docs/GITHUB-SETUP.md` §2–§5 | the script ends with no FAIL lines, or only plan-limited ones you accept |
 | 4 | Claude | Create `config` and `.github`, and seed `config` with the PR #1 files (`AGENTS.md` with the new org name, `ops/`, `tests/`, `Makefile`, CI, `.claude/settings.json`, the gitleaks hook). Default branch `main`, CI green | first PR merged |
 | 5 | Claude | Seed the six product and platform repos (created in step 3) from the `config` template files, each with a README stating what belongs in it | 8 repos have CI green |
 | 6 | Claude + you | Generate the classification sheet for all old repos; you approve it in batches | sheet approved |
