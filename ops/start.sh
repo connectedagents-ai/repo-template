@@ -34,7 +34,8 @@ check_setup() {
   if ls "$HOME/Library/Mail" >/dev/null 2>&1; then ok "Terminal has Full Disk Access"; else warn "Terminal lacks Full Disk Access: System Settings → Privacy & Security → Full Disk Access → Terminal, then reopen Terminal"; fi
   ok "Free space on this Mac: $(df -h "$HOME" | awk 'NR==2 {print $4}')"
   n=0; for c in $(which -a claude 2>/dev/null | sort -u); do n=$((n + 1)); done
-  [ "$n" -gt 1 ] && warn "You have $n copies of the claude command: $(which -a claude | sort -u | tr '\n' ' ')"
+  if [ "$n" -gt 1 ]; then warn "You have $n copies of the claude command: $(which -a claude | sort -u | tr '\n' ' ')"; fi
+  return 0  # a report of what's missing, not a failure
 }
 
 menu() {
