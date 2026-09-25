@@ -13,7 +13,7 @@ files out of code repos.
   a Mac folder tree turned into one repo per folder (`dev-*`, `development-onewish-*`, `dev-cursorcloudagents-dev-*`, …).
 - The same names appear in both orgs (`onewish-os`, `codex-platform`, `LitigationForce.AI`, `gemini-cli`, …). There are also
   random names (`olive-prairie-acorn-kite`, `turbo-crane-mountain-wave`) and many unmodified forks.
-- `repo-template`'s default branch is called `VeritasLegalTech`, a product name on a generic template.
+- `repo-template`'s default branch was named after an unused product idea; it was renamed to `main` on 2026-09-25.
 - `agent-central-config` has live keys and about 173 MB of case files **in its git history**, so it must never be copied with its history.
 
 ## 2. The new org
