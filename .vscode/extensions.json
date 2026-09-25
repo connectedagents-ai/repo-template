@@ -1,0 +1,11 @@
+{
+  "recommendations": [
+    "anthropic.claude-code",
+    "GitHub.copilot",
+    "GitHub.copilot-chat",
+    "GitHub.vscode-pull-request-github",
+    "1Password.op-vscode",
+    "EditorConfig.EditorConfig",
+    "ms-python.python"
+  ]
+}

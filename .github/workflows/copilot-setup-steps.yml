@@ -1,0 +1,20 @@
+name: Copilot setup steps
+# Prepares the environment for the GitHub Copilot coding agent before it starts work.
+# The job must be named copilot-setup-steps. Add the repo's real setup to `make setup`.
+on:
+  workflow_dispatch:
+  push: { paths: [.github/workflows/copilot-setup-steps.yml] }
+  pull_request: { paths: [.github/workflows/copilot-setup-steps.yml] }
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with: { persist-credentials: false }
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Project setup
+        run: if [ -f Makefile ] && grep -q '^setup:' Makefile; then make setup; fi

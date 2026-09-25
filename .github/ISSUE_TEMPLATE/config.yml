@@ -1,0 +1,5 @@
+blank_issues_enabled: false
+contact_links:
+  - name: Plan work in Linear
+    url: https://linear.app/powerconnection
+    about: Linear is where dev work is planned. Use a GitHub issue only for a bug or task tied to this repo.

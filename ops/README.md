@@ -19,8 +19,8 @@ Everything here is **dry-run by default**, copies or archives instead of deletin
 | 3c | **Dedup** every surface (Mac, cloud folders, iCloud, and via their APIs Google Drive, OneDrive, SharePoint, pCloud): parallel dry-run scan → plan → approved archive (SSD, or each cloud's own archive folder) | `dedup/README.md` · `bash dedup/connect_cloud.sh` · `bash dedup/start_here.sh` |
 | 3e | Microsoft tenants: finish the netzerolending.io move (mail done 2026-05-21, files not yet), personal OneDrive, retire the old tenant | `microsoft/TENANT-MIGRATION.md` |
 | 3d | Wire **Codex + Grok CLI** (and every AI tool) to one core MCP set, one install per CLI, and audit agent access (bot vaults, AI OAuth apps) | `mcp/README.md` · `mcp/park_mcp_servers.py` |
-| 4 | Reset global agent config | copy `mac-cleanup/templates/CLAUDE.md` + `settings.json` into `~/.claude/`. Configure the other CLIs per `../docs/GITHUB-SETUP.md` §4 |
-| 5 | Set up the GitHub org, apps and CLI | `../docs/GITHUB-SETUP.md` |
+| 4 | Reset global agent config | copy `mac-cleanup/templates/CLAUDE.md` + `settings.json` into `~/.claude/`. Configure the other CLIs and IDEs per `../docs/GITHUB-SETUP.md` §7 |
+| 5 | Set up the GitHub org, apps, Copilot and CLI | preview `bash github-setup/configure_github.sh <ORG>`, then `--apply --create-repos` · the web-only steps in `../docs/GITHUB-SETUP.md` §2–§5 |
 | 6 | Move every other org or account into `connectedagents-ai` | `bash github-consolidation/migrate_to_connectedagents.sh Connected-Energy-AI` → `--apply` |
 | 7 | Collapse ~280 repos into ~10 | `github-consolidation/MIGRATION-PLAN.md` step 2 · `bash github-consolidation/merge_into_monorepo.sh --apply <target> <owner/src> <path>` → PR → archive the source |
 | 8 | Export Perplexity, ChatGPT/OpenAI, Grok/xAI, Copilot (3 accounts), Google (Gemini, NotebookLM, AI Studio), Antigravity, Claude → central library | `ai-library/README.md` · `python3 ai-library/ingest_library.py --source <tool> --account <label> <export>` |
