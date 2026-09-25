@@ -1,0 +1,3 @@
+# False positives only. Each line is a gitleaks fingerprint (commit:file:rule:line); never list a real secret here.
+# Public GPG fingerprint of 1Password's CLI signing key, not a credential:
+3ea39f793e33e06b88f12b3e755f68739cb3e62c:ops/1password/install-op-cli.sh:generic-api-key:8

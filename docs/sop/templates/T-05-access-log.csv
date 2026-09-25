@@ -1,0 +1,2 @@
+id,system,access_type,granted_to,granted_by,granted_on,purpose,revoke_by,revoked_on,verified_by
+A-001,Client Mac,Full Disk Access (Terminal),Agent operator,Client,,Discovery scan,,,

@@ -1,0 +1,21 @@
+name: Bug or task
+description: Something to fix or build in this repo
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+      description: What should change, and why it matters. For a bug, the steps to reproduce and what you expected.
+    validations: { required: true }
+  - type: input
+    id: linear
+    attributes:
+      label: Linear issue
+      placeholder: POW-123
+  - type: checkboxes
+    id: data
+    attributes:
+      label: Data check
+      options:
+        - label: This issue contains no secrets, client PII or privileged legal material
+          required: true

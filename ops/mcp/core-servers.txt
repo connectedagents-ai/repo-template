@@ -1,0 +1,11 @@
+# Core MCP servers every AI tool gets (one name per line; must match the server names used in each config).
+# Fill this with the SAME core set used for the Cursor/VS Code/Antigravity consolidation (mcp.parked.json on the Mac),
+# so Claude, Codex, Cursor, Gemini and Grok all see one consistent toolset. Secrets come from 1Password (op:// refs).
+# Everything not listed is parked (reversible) by park_mcp_servers.py.
+#
+# github
+# filesystem
+# playwright
+# firecrawl
+# 1password
+# notion
