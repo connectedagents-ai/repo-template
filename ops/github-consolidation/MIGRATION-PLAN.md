@@ -2,6 +2,9 @@
 
 **Decision (2026-09-24):** `connectedagents-ai` is the **only** GitHub account/org. Everything else migrates in, then goes quiet.
 
+> **Superseded target (2026-09-25):** the fresh-start plan in `docs/GITHUB-BLUEPRINT.md` replaces `connectedagents-ai` as the
+> destination with a new clean org and a handful of monorepos. Step 0 below (secrets, case files) still applies first.
+
 > ⚠️ **Reverse the old direction first.** `connectedagents-ai/repo-template` and `connectedagents-ai/agent-central-config`
 > carry a "MOVED → Connected-Energy-AI" banner. That migration ran the wrong way. This branch removes the banner from
 > `repo-template`. Do the same in `agent-central-config` once its secrets issue (below) is fixed.
