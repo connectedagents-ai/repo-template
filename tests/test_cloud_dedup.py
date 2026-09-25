@@ -16,6 +16,18 @@ esac
 '''
 
 
+def fake_rclone(tmp, files):
+    fake = tmp / "fake"
+    (tmp / "bin").mkdir(exist_ok=True)
+    fake.mkdir(exist_ok=True)
+    rc = tmp / "bin/rclone"
+    rc.write_text(FAKE_RCLONE)
+    rc.chmod(rc.stat().st_mode | stat.S_IEXEC)
+    for path, items in files.items():
+        (fake / (path.replace("/", "_").replace(":", "_") + ".json")).write_text(json.dumps(items))
+    return {"PATH": f"{tmp / 'bin'}:{os.environ['PATH']}", "FAKE": str(fake)}
+
+
 def lsjson(items):
     return "[\n" + ",\n".join(json.dumps(i) for i in items) + "\n]\n"
 
@@ -63,15 +75,7 @@ class CloudDedupTest(TempDirTest):
         self.assertIn("would move: 0", r.stdout)
 
     def fake_rclone(self, files):
-        fake = self.tmp / "fake"
-        (self.tmp / "bin").mkdir(exist_ok=True)
-        fake.mkdir(exist_ok=True)
-        rc = self.tmp / "bin/rclone"
-        rc.write_text(FAKE_RCLONE)
-        rc.chmod(rc.stat().st_mode | stat.S_IEXEC)
-        for path, items in files.items():
-            (fake / (path.replace("/", "_").replace(":", "_") + ".json")).write_text(json.dumps(items))
-        return {"PATH": f"{self.tmp / 'bin'}:{os.environ['PATH']}", "FAKE": str(fake)}
+        return fake_rclone(self.tmp, files)
 
     def test_cloud_apply_only_archives_when_keeper_is_in_the_same_account(self):
         env = self.fake_rclone({})
@@ -89,7 +93,9 @@ class CloudDedupTest(TempDirTest):
             w.writerow([2, "md5:y", 10, "keep", "gdrive-work", "gdrive-work:A/x.pdf", "md5:y"])
             w.writerow([2, "md5:y", 10, "archive", "gdrive-work", "gdrive-work:B/x.pdf", "md5:y"])  # changed since scan
         env = self.fake_rclone({"gdrive-work:Old/report (1).pdf": [{"Path": "report (1).pdf", "Hashes": {"md5": MD5}}],
-                                "gdrive-work:B/x.pdf": [{"Path": "x.pdf", "Hashes": {"md5": "different"}}]})
+                                "gdrive-work:Reports/report.pdf": [{"Path": "report.pdf", "Hashes": {"md5": MD5}}],
+                                "gdrive-work:B/x.pdf": [{"Path": "x.pdf", "Hashes": {"md5": "different"}}],
+                                "gdrive-work:A/x.pdf": [{"Path": "x.pdf", "Hashes": {"md5": "y"}}]})
         r = self.run_py(CLOUD_APPLY, "--plan", plan, "--out", self.tmp, "--apply", env=env)
         moves = (self.tmp / "fake/moves").read_text().splitlines()
         self.assertEqual(len(moves), 1)
@@ -98,6 +104,40 @@ class CloudDedupTest(TempDirTest):
         (restore,) = self.tmp.glob("cloud-dedup-*/restore.sh")
         self.assertIn("rclone moveto", restore.read_text())
         subprocess.run(["bash", "-n", str(restore)], check=True)
+
+
+class CloudApplyKeeperTest(TempDirTest):
+    def test_duplicate_is_not_archived_when_the_keeper_changed(self):
+        plan = self.tmp / "plan.csv"
+        with open(plan, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["group", "sha256", "size", "action", "surface", "path", "hashes"])
+            w.writerow([1, "md5:m", 10, "keep", "gdrive-work", "gdrive-work:K/a.pdf", "md5:m"])
+            w.writerow([1, "md5:m", 10, "archive", "gdrive-work", "gdrive-work:D/a.pdf", "md5:m"])
+        env = fake_rclone(self.tmp, {"gdrive-work:D/a.pdf": [{"Path": "a.pdf", "Hashes": {"md5": "m"}}],
+                                "gdrive-work:K/a.pdf": [{"Path": "a.pdf", "Hashes": {"md5": "edited"}}]})
+        r = self.run_py(CLOUD_APPLY, "--plan", plan, "--out", self.tmp, "--apply", env=env)
+        self.assertIn("keeper missing or changed since scan", r.stdout)
+        self.assertFalse((self.tmp / "fake/moves").exists())
+
+
+class InventoryFilesTest(TempDirTest):
+    def test_folder_scans_of_one_account_keep_separate_files_and_overlaps_count_once(self):
+        run = self.tmp / "run"
+        docs = self.tmp / "docs.json"
+        docs.write_text(lsjson([{"Path": "a.pdf", "Size": 9, "ModTime": "2025-01-01T00:00:00Z", "Hashes": {"md5": "q"}}]))
+        arch = self.tmp / "arch.json"
+        arch.write_text(lsjson([{"Path": "old/a.pdf", "Size": 9, "ModTime": "2025-01-01T00:00:00Z", "Hashes": {"md5": "q"}}]))
+        whole = self.tmp / "whole.json"
+        whole.write_text(lsjson([{"Path": "Shared Documents/a.pdf", "Size": 9, "ModTime": "2025-01-01T00:00:00Z", "Hashes": {"md5": "q"}}]))
+        self.run_py(CLOUD_INV, "--remote", "sp-legal:Shared Documents", "--from-json", docs, "--out", run)
+        self.run_py(CLOUD_INV, "--remote", "sp-legal:Archive", "--from-json", arch, "--out", run)
+        self.run_py(CLOUD_INV, "--remote", "sp-legal:", "--from-json", whole, "--out", run)
+        self.assertEqual(len(list(run.glob("inventory-sp-legal*.csv"))), 3)
+        self.run_py(MERGE, "--in", run)
+        with open(run / "duplicates.csv", newline="") as f:
+            paths = sorted(r["path"] for r in csv.DictReader(f))
+        self.assertEqual(paths, ["sp-legal:Archive/old/a.pdf", "sp-legal:Shared Documents/a.pdf"])
 
 
 class QuickXorHashTest(TempDirTest):

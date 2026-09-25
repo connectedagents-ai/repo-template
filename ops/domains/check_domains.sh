@@ -29,11 +29,18 @@ for d in "$@"; do
   echo "  verif.    : $(dig +short TXT "$d" | grep -ioE '(google-site-verification|MS=ms[0-9]+)' | sort -u | tr '\n' ' ')"
   echo "  DMARC     : $(dig +short TXT "_dmarc.$d" | tr -d '"')"
   for u in "http://$d" "https://$d" "https://www.$d"; do
-    res="$(curl -sS -o /dev/null -m 10 -w '%{http_code} → %{redirect_url}' "$u" 2>&1)"; rc=$?
+    res="$(curl -sS -o /dev/null -m 10 -w '%{http_code} %{redirect_url}' "$u" 2>&1)"; rc=$?
     if [ "$rc" -ne 0 ]; then echo "  web       : $u  ⚠ REQUEST FAILED (curl exit $rc): $res"
     else
-      case "$res" in *powerconnection.com*) flag="✅";; 301*|302*|307*|308*) flag="↪ (not to powerconnection.com)";; *) flag="";; esac
-      echo "  web       : $u  $res $flag"
+      code="${res%% *}"; target="${res#* }"
+      host="$(printf '%s' "$target" | sed -E 's#^[a-zA-Z]+://([^/:?#]+).*#\1#' | tr 'A-Z' 'a-z')"
+      case "$code:$host" in
+        301:powerconnection.com|301:www.powerconnection.com) flag="✅ permanent redirect";;
+        30[278]:powerconnection.com|30[278]:www.powerconnection.com) flag="⚠ $code is temporary: use 301";;
+        30?:*) flag="↪ redirects elsewhere ($host), not to powerconnection.com";;
+        *) flag="";;
+      esac
+      echo "  web       : $u  $code → ${target:-(none)} $flag"
     fi
   done
 done

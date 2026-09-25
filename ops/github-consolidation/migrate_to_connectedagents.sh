@@ -45,9 +45,13 @@ settle_unconfirmed() {
   local src="$1" name="$2" archived="$3" owner
   owner="$(gh api "repos/$src/$name" --jq .owner.login 2>/dev/null)"  # GitHub redirects a moved repo
   echo "    ⏳ transfer of $src/$name NOT confirmed after 2 min; the repo is currently owned by: ${owner:-unknown}" >&2
-  if [ "$archived" = true ] && [ -n "$owner" ]; then
-    gh repo archive "$owner/$name" --yes >/dev/null 2>&1 \
-      || echo "    ⚠ could not re-archive $owner/$name: run  gh repo archive $owner/$name --yes" >&2
+  [ "$archived" = true ] || return 0
+  # It was unarchived for the move, so until it is re-archived it is writable wherever it now lives.
+  if [ -n "$owner" ] && gh repo archive "$owner/$name" --yes >/dev/null 2>&1; then
+    echo "    re-archived $owner/$name" >&2
+  else
+    echo "    ⚠ ARCHIVE NOT RESTORED: find $name (under $src or $TARGET) and run  gh repo archive <owner>/$name --yes  before continuing" >&2
+    echo "$src/$name (archive NOT restored; repo is writable)" >> "$FAILED"
   fi
 }
 
@@ -73,9 +77,9 @@ for SRC in "$@"; do
         # transfers are asynchronous: wait (up to ~2 min) until the repo answers under the new owner
         tries=0
         arrived=0
-        until [ "$tries" -ge 24 ]; do
+        until [ "$tries" -ge "${TRANSFER_WAIT_TRIES:-24}" ]; do
           if gh api "repos/$TARGET/$name" --jq .full_name 2>/dev/null | grep -qix "$TARGET/$name"; then arrived=1; break; fi
-          sleep 5; tries=$((tries + 1))
+          sleep "${TRANSFER_WAIT_SECS:-5}"; tries=$((tries + 1))
         done
         if [ "$arrived" = 0 ]; then
           settle_unconfirmed "$SRC" "$name" "$archived"

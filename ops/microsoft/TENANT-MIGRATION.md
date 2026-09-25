@@ -27,8 +27,9 @@ to SharePoint via rclone: In Progress), POW-153 (SharePoint bookkeeping sites), 
    Result: `PLAN.md` with what exists only in netzerolending / the personal OneDrive, and what is already duplicated elsewhere.
 4. **Migrate what exists only in the old tenant / personal OneDrive** to the target chosen in D2 (Google Drive or the
    OneWish Labs SharePoint), as a **copy** (never a move), server-to-server with rclone:
-   `rclone copy onedrive-netzerolending: <target>:Archive/netzerolending --dry-run` → review → run without `--dry-run`
-   → `rclone check onedrive-netzerolending: <target>:Archive/netzerolending --one-way` must report 0 differences.
+   set the target remote once, e.g. `TARGET=sp-centralfilecloud` (or `gdrive-powerconnection`), then
+   `rclone copy onedrive-netzerolending: "${TARGET}:Archive/netzerolending" --dry-run` → review → run without `--dry-run`
+   → `rclone check onedrive-netzerolending: "${TARGET}:Archive/netzerolending" --one-way` must report 0 differences.
    Privileged legal material goes to the litigation evidence store instead (with counsel), per MIGRATION-PLAN step 0.
 5. **Retire the source** only after step 4 checks clean: make it read-only for 30 days, then follow
    `ops/domains/DOMAIN-CONSOLIDATION.md` (M365 domain removal order) for netzerolending.io. The personal Microsoft account

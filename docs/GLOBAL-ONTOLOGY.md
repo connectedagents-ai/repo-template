@@ -38,9 +38,11 @@ Domain models (legal matters such as Mullins, tax, CRM, voice agents) are **name
 - **Not checked:** Cursor workspaces and other GitHub orgs/repos (not reachable from here); the Mac run logs. `bash ops/start.sh` → 4 lists the Mac side.
 
 ## Process (each step produces a reviewable file; nothing is renamed or moved until step 6)
-1. **Collect.** Export every candidate above (plus Notion wikis and the Mac run logs) into `agent-central-config/ontology/sources/` with
-   `ingest_library.py --source ontology` (dedups copies and records where each came from). Privileged legal models (Mullins) stay in
-   the litigation store and are referenced by name only.
+1. **Collect.** Download every candidate above (plus Notion wikis and the Mac run logs) into one folder, then file it into the
+   **private raw store** (not a git repo): `python3 ops/ai-library/ingest_library.py --source ontology --account <label> <folder>`
+   (dry run), then the same with `--apply`. It dedups copies and records where each came from. After review in step 2, only the
+   reviewed, non-sensitive ontology material is committed to `agent-central-config/ontology/`. Privileged legal models (Mullins)
+   stay in the litigation store and are referenced by name only.
 2. **Compare.** One table: every source × the six chapters above: what each defines, where they agree, where they conflict.
    Recommended base: `ontology_v1.yaml` (versioned, machine-readable, has validation rules), with naming from `NAMING-CONVENTIONS.md`
    and topology from `CLOUD-ARCHITECTURE.md`. Decide each conflict once, and record the decision.

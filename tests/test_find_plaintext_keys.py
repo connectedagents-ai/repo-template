@@ -46,12 +46,30 @@ class FindPlaintextKeysTest(TempDirTest):
         self.assertIn("npmjs", fpk.rotate_url("NPM_TOKEN"))
         self.assertIn("github", fpk.rotate_url("//npm.pkg.github.com/:_authToken"))
 
-    def test_committed_key_is_flagged_and_exits_nonzero(self):
+    def test_key_in_git_history_is_flagged_but_merely_staged_is_not(self):
         repo = self.tmp / "repo"
         repo.mkdir()
+        git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@t"]
         subprocess.run(["git", "init", "-q", str(repo)], check=True)
         (repo / ".env").write_text("XAI_API_KEY=fake-xai-value-4\n")
-        subprocess.run(["git", "-C", str(repo), "add", ".env"], check=True)
+        subprocess.run(git + ["add", ".env"], check=True)
+        r = self.run_py(FIND, "--no-defaults", repo, check=False)
+        self.assertEqual(r.returncode, 0)
+        self.assertIn("tracked by git", r.stdout)
+        subprocess.run(git + ["commit", "-qm", "oops"], check=True)
         r = self.run_py(FIND, "--no-defaults", repo, check=False)
         self.assertEqual(r.returncode, 1)
-        self.assertIn("COMMITTED TO GIT", r.stdout)
+        self.assertIn("IN GIT HISTORY", r.stdout)
+
+    def test_quoted_values_with_spaces_are_scanned_whole(self):
+        rc = self.tmp / ".zshrc"
+        rc.write_text('export DB_PASSWORD="correct horse battery staple"\n')
+        self.assertIn("DB_PASSWORD", self.run_py(FIND, "--no-defaults", rc).stdout)
+
+    def test_unreadable_files_make_the_scan_incomplete(self):
+        d = self.tmp / "cfg"
+        d.mkdir()
+        (d / "settings.json").symlink_to(d / "missing.json")
+        r = self.run_py(FIND, "--no-defaults", d, check=False)
+        self.assertEqual(r.returncode, 2)
+        self.assertIn("INCOMPLETE", r.stdout)

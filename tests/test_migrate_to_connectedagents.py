@@ -65,3 +65,14 @@ class MigrateTest(TempDirTest):
         r = self.migrate("OwnerA")
         self.assertNotEqual(r.returncode, 0)
         self.assertEqual(list(self.tmp.glob("migration-plan-*.csv")), [])
+
+    def test_unconfirmed_transfer_of_archived_repo_with_unknown_owner_is_reported(self):
+        (self.fake / "OwnerA.tsv").write_text("old\ttrue\tfalse\tPRIVATE\n")
+        never_arrives = FAKE_GH.replace('echo "connectedagents-ai/${2##*/}"', "exit 1")
+        (self.tmp / "bin/gh").write_text(never_arrives)
+        env = {**os.environ, "PATH": f"{self.tmp / 'bin'}:{os.environ['PATH']}", "FAKE": str(self.fake),
+               "TRANSFER_WAIT_TRIES": "1", "TRANSFER_WAIT_SECS": "0"}
+        r = subprocess.run(["bash", str(MIGRATE), "--apply", "OwnerA"], cwd=self.tmp, env=env, capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0)
+        self.assertIn("ARCHIVE NOT RESTORED", r.stderr)
+        self.assertIn("OwnerA/old (archive NOT restored", r.stderr)

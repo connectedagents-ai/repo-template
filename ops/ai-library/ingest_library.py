@@ -125,9 +125,13 @@ def split_chatgpt(path: Path, out: Path, apply: bool) -> int:
         if apply:
             out.mkdir(parents=True, exist_ok=True)
             ident = slug(str(c.get("id") or c.get("conversation_id") or f"{created}-{title}"))
-            for old in out.glob(f"*--{ident}.md"):  # same conversation from an earlier export: replace it
-                old.unlink()
-            (out / f"{created}-{slug(title)[:80]}--{ident}.md").write_text("\n".join(body), encoding="utf-8")
+            dest = out / f"{created}-{slug(title)[:80]}--{ident}.md"
+            tmp = dest.with_name(dest.name + ".tmp")
+            tmp.write_text("\n".join(body), encoding="utf-8")
+            os.replace(tmp, dest)  # the new copy is complete before any older one is removed
+            for old in out.glob(f"*--{ident}.md"):  # same conversation from an earlier export, under an older title
+                if old != dest:
+                    old.unlink()
         n += 1
     return n
 
@@ -161,7 +165,11 @@ def unpack_zip(inp: Path, tmp_parent: Path, min_free_gb: float) -> Path:
                 raise SystemExit(f"refusing {inp}: member {m.filename!r} points outside the archive")
         ensure_room(tmp_parent, sum(m.file_size for m in members), min_free_gb)
         t = Path(tempfile.mkdtemp(prefix=".ingest-", dir=tmp_parent))
-        z.extractall(t)
+        try:
+            z.extractall(t)
+        except BaseException:
+            shutil.rmtree(t, ignore_errors=True)  # don't leave a half-extracted archive behind
+            raise
     return t
 
 
@@ -218,6 +226,9 @@ def main():
                 for d, dirnames, filenames in walk(root):
                     if "SKILL.md" in filenames and d != root.parent:
                         dirnames[:] = []
+                        if (d / "SKILL.md").is_symlink():  # the copy would have no entry point
+                            print(f"skip-skill {d} (SKILL.md is a symlink)")
+                            continue
                         h = skill_hash(d)
                         prov = {"source": a.source, "account": a.account, "origin": str(origin / d.relative_to(root))}
                         if h in by_hash:
@@ -249,9 +260,12 @@ def main():
                 h = sha256(f)
                 orig = str(origin / f.relative_to(root)) if root.is_dir() else str(origin)
                 prov = {"source": a.source, "account": a.account, "origin": orig}
+                chats_dir = lib / "sources" / slug(a.source) / slug(a.account) / "chats"
                 if h in by_hash:
                     stats["duplicate"] += 1
                     add_origin(by_hash[h], prov)
+                    if CHATGPT_CONVERSATIONS.fullmatch(f.name):  # same export, maybe another account: still split it here
+                        stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, chats_dir, a.apply)
                     continue
                 k = kind_of(f)
                 dest = lib / "sources" / slug(a.source) / slug(a.account) / k / slug(f.name)
@@ -269,7 +283,7 @@ def main():
                     shutil.copy2(f, dest)
                     catalog[entry["path"]] = entry
                 if CHATGPT_CONVERSATIONS.fullmatch(f.name):
-                    stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, lib / "sources" / slug(a.source) / slug(a.account) / "chats", a.apply)
+                    stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, chats_dir, a.apply)
 
     except NoRoom as e:  # keep the catalog consistent with what was already copied
         stopped = str(e)

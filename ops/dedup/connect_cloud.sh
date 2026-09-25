@@ -30,17 +30,18 @@ while true; do
     3|4) kind=onedrive; [ "$c" = 4 ] && kind=sp
        printf '  Short label (e.g. onewishlabs, netzerolending, personal%s): ' "$( [ "$c" = 4 ] && echo ', or the site name like legalmatters')"; read -r l
        l="$(printf '%s' "$l" | tr 'A-Z' 'a-z' | tr -cd 'a-z0-9-')"; [ -n "$l" ] || { echo "  Please type a label."; continue; }
-       say "Answer rclone's questions like this:"
-       echo "   • region: 1 (Microsoft Cloud Global) · client_id / client_secret: press Return · edit advanced config: n"
-       echo "   • 'Use web browser to automatically authenticate': y → sign in with the account for '$l'"
        if [ "$c" = 3 ]; then
-         echo "   • type of connection: 'OneDrive Personal or Business', then pick the drive it lists (usually the first)"
+         say "A browser window opens: sign in with the Microsoft account for '$l'. Your own OneDrive is connected."
+         rclone config create "$kind-$l" onedrive config_type=onedrive || continue
        else
-         echo "   • type of connection: 'Sharepoint site name or URL' → paste the site URL (e.g. https://<tenant>.sharepoint.com/sites/LEGALMATTERS),"
-         echo "     then pick the document library it lists (usually 'Documents' / 'Shared Documents')"
+         printf '  Paste the SharePoint site URL (e.g. https://<tenant>.sharepoint.com/sites/LEGALMATTERS): '; read -r site
+         case "$site" in https://*.sharepoint.com/*) ;; *) echo "  That doesn't look like a SharePoint site URL. Nothing changed."; continue ;; esac
+         say "A browser window opens: sign in with an account that can open that site."
+         rclone config create "$kind-$l" onedrive config_type=url config_site_url="$site" || continue
        fi
-       echo "   • confirm with y. Microsoft grants read and write; the dedup scan only reads, and nothing is downloaded."
-       rclone config create "$kind-$l" onedrive && echo "  ✅ connected as $kind-$l:" ;;
+       echo "  ✅ connected as $kind-$l:  (the site's default document library). Check it shows the right folders:"
+       rclone lsd "$kind-$l:" 2>&1 | head -10 | sed 's/^/     /'
+       echo "   Microsoft grants read and write; the dedup scan only reads, and nothing is downloaded." ;;
     q|Q|"") break ;;
     *) echo "  Type 1, 2, 3, 4 or q." ;;
   esac

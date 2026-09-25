@@ -77,10 +77,13 @@ def main():
     ap.add_argument("--workers", type=int, default=8)
     a = ap.parse_args()
 
-    rows = []
+    rows, seen_paths = [], set()
     for inv in sorted(glob.glob(str(a.indir / "inventory-*.csv"))):
         with open(inv, newline="") as f:
             for r in csv.DictReader(f):
+                if r["path"] in seen_paths:  # overlapping scans (whole account + one of its folders): count a file once
+                    continue
+                seen_paths.add(r["path"])
                 r["size"], r["mtime"] = int(r["size"]), int(r["mtime"])
                 r["local"], r["legal"] = r["local"] == "1", r["legal"] == "1"
                 r["hashes"] = parse_hashes(r.get("hashes"))  # provider checksums (cloud inventories only)
@@ -167,7 +170,7 @@ def main():
     surfaces = sorted({r["surface"] for r in rows})
     lines = ["# Dedup plan (dry run: nothing has moved)", "",
              f"{len(rows)} files scanned across {len(surfaces)} surfaces · {len(to_hash)} local files hashed (size collisions) · "
-             f"{sum(bool(r['hashes']) and not r['local'] for r in rows)} cloud files matched by provider checksum · "
+             f"{sum(bool(r.get('group_key')) and not r['local'] for r in rows)} cloud files matched by provider checksum · "
              f"{len(groups)} exact-duplicate groups", "", "| Surface | Files | Cloud-only | Legal-flagged | Reclaimable (archive) |", "|---|---|---|---|---|"]
     for s in surfaces:
         sr = [r for r in rows if r["surface"] == s]

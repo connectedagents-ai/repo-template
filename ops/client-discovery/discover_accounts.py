@@ -22,7 +22,7 @@ titles are kept only for AI project-type URLs. Mail: sender domains are counted;
 messages (expiry, renewal, parked, suspension, payment, sign-in, bounces). Bodies are never read.
 Needs Terminal "Full Disk Access" for Safari and Mail. Chromium DBs are copied to a temp file first (browsers lock them).
 """
-import argparse, csv, datetime, glob, json, os, plistlib, re, shutil, sqlite3, subprocess, tempfile
+import argparse, csv, datetime, glob, json, os, plistlib, re, shutil, sqlite3, subprocess, sys, tempfile
 from collections import defaultdict
 from pathlib import Path
 from urllib.parse import urlparse
@@ -74,7 +74,7 @@ TENANT_PATTERNS = [
 AI_PROJECT_PATHS = {
     "claude.ai": ("/project/",), "chatgpt.com": ("/g/", "/gpts", "/project"), "perplexity.ai": ("/spaces/", "/collections/", "/page/"),
     "gemini.google.com": ("/gem/",), "notebooklm.google.com": ("/notebook/",), "grok.com": ("/project",),
-    "aistudio.google.com": ("/prompts/",), "copilotstudio.microsoft.com": ("/",),
+    "aistudio.google.com": ("/prompts/",),  # Copilot Studio left out until its agent URL pattern is verified
 }
 
 
@@ -201,15 +201,18 @@ def apple_mail(hit, allowed):
     idx = sorted(glob.glob(str(HOME / "Library/Mail/V*/MailData/Envelope Index")),
                  key=lambda p: int(re.search(r"/V(\d+)/", p).group(1)) if re.search(r"/V(\d+)/", p) else 0)
     accounts = mail_accounts_map()
-    acct_rows, alerts = {}, []
+    acct_rows, alerts, unresolved = {}, [], set()
     if not idx:
         print("  Apple Mail: no Envelope Index (Mail not used, or Terminal lacks Full Disk Access)")
-        return acct_rows, alerts, accounts
+        return acct_rows, alerts, accounts, unresolved
     q = ("SELECT mb.url, a.address, s.subject, m.date_received FROM messages m "
          "JOIN mailboxes mb ON m.mailbox = mb.ROWID LEFT JOIN addresses a ON m.sender = a.ROWID "
          "LEFT JOIN subjects s ON m.subject = s.ROWID")
     for url, sender, subject, received in read_sqlite(idx[-1], q):
         acct_id = urlparse(url or "").netloc
+        if allowed is not None and acct_id not in accounts:
+            unresolved.add(acct_id)  # can't tell whose mailbox this is, so it can't be matched to Schedule A
+            continue
         user = accounts.get(acct_id, (acct_id, ""))[0] or acct_id
         if not in_scope(user, allowed):
             continue
@@ -224,7 +227,7 @@ def apple_mail(hit, allowed):
         is_bounce = domain.startswith(("mailer-daemon", "postmaster")) or (sender or "").lower().startswith(("mailer-daemon", "postmaster"))
         if (c or is_bounce) and subject and ALERT.search(subject):
             alerts.append([ts.strftime("%Y-%m-%d"), user, domain, subject[:160]])
-    return acct_rows, alerts, accounts
+    return acct_rows, alerts, accounts, unresolved
 
 
 def main():
@@ -289,9 +292,9 @@ def main():
         except Exception as e:
             print(f"  skip 1Password: {e} (sign in with `op signin`)")
 
-    mail_rows, mail_alerts, sys_accounts = {}, [], {}
+    mail_rows, mail_alerts, sys_accounts, unresolved = {}, [], {}, set()
     if a.consent_4b and (mail_allowed is None or mail_allowed):
-        mail_rows, mail_alerts, sys_accounts = apple_mail(hit, mail_allowed)
+        mail_rows, mail_alerts, sys_accounts, unresolved = apple_mail(hit, mail_allowed)
     elif a.consent_4b:
         print("  Apple Mail: no --mail-accounts given (Schedule A), skipped")
 
@@ -345,6 +348,10 @@ def main():
         w.writerows(sorted(mail_alerts, reverse=True))
     print(f"  mail accounts: {len(mail_rows)} · mail alerts: {len(mail_alerts)}")
     print(f"  platforms: {len(plat)} · AI projects: {len(projects)} · bookmarks: {n_bm} · 1Password items: {len(op_rows)}")
+    if unresolved:  # the caller marks the bundle incomplete on a non-zero exit
+        print(f"  ⚠ Apple Mail: {len(unresolved)} mailbox account(s) could not be identified (macOS Internet Accounts unreadable?), "
+              "so their messages were NOT checked against Schedule A. Grant Full Disk Access and re-run.")
+        sys.exit(3)
 
 
 if __name__ == "__main__":

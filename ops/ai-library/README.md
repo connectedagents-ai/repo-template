@@ -106,6 +106,7 @@ with a distinct `--account` label for each.
 ## Promotion rules
 - **Skill:** a repeatable procedure with steps. Use the Agent Skills format (`SKILL.md` with `name` + `description` front matter) so every tool can load it.
 - **Prompt:** a single system/instruction block. One file per prompt, with front matter `source:` (tool + account) and `use-for:`.
-- **Template / form:** the blank, reusable version only. Filled-in client copies stay in the product repo or document vault, never here.
+- **Template / form:** the blank, reusable version only. Filled-in client copies go only to the designated private document vault, never
+  into this repo or a product repo (AGENTS.md §4: no client PII or privileged material in code repos).
 - One canonical copy per item. If two tools had variants, merge them into the better one and note `supersedes:` in its front matter.
 - No secrets, no client PII, no privileged litigation material in this repo.

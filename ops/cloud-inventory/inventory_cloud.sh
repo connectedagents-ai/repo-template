@@ -5,6 +5,8 @@
 # Writes ~/cloud-inventory-YYYYMMDD-HHMMSS.md  (feed it into docs/CLOUD-ARCHITECTURE.md §3)
 #
 #   bash inventory_cloud.sh
+#   INCLUDE_1PASSWORD=0 bash inventory_cloud.sh   # skip 1Password (client discovery passes this unless clause 4b is consented)
+# Exits 1 if any command that ran failed (the report is still written, with "(failed: …)" markers).
 #
 # Logins (once): az login --allow-no-subscriptions · gcloud auth login · gh auth login · vercel login · wrangler login · op signin
 # macOS bash 3.2 OK.
@@ -13,7 +15,8 @@ set -u
 umask 077  # reports list accounts, vaults and history: readable by this user only
 OUT="${OUT:-$HOME/cloud-inventory-$(date +%Y%m%d-%H%M%S).md}"
 out() { printf '%s\n' "$*" >> "$OUT"; }
-run() { out '```'; "$@" >> "$OUT" 2>&1 || out "(failed: $*)"; out '```'; out ""; }
+FAILED=0
+run() { out '```'; "$@" >> "$OUT" 2>&1 || { out "(failed: $*)"; FAILED=1; }; out '```'; out ""; }
 have() { command -v "$1" >/dev/null 2>&1 || { out "_$1 not installed — skipped_"; out ""; return 1; }; }
 
 : > "$OUT"
@@ -74,7 +77,9 @@ out "## L4 · Cloudflare"
 if have wrangler; then run wrangler whoami; run wrangler pages project list; fi
 
 out "## L0 · 1Password (names only, never values)"
-if have op; then
+if [ "${INCLUDE_1PASSWORD:-1}" != 1 ]; then
+  out "_skipped: 1Password is a clause 4b source and consent was not given_"
+elif have op; then
   run op account list
   run op vault list
   out "Vault sharing (who can open each vault: look for bots and broad shares):"
@@ -85,3 +90,4 @@ if have op; then
 fi
 
 echo "Inventory written: $OUT"
+[ "$FAILED" = 0 ] || { echo "Some commands failed; see the (failed: …) lines in the report." >&2; exit 1; }

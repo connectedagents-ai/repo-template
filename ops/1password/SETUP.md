@@ -9,7 +9,7 @@ never to Employee, Litigation-Secure or Investment-Operations. Secrets are refer
 | AI-Agents | LLM API keys (Anthropic, OpenAI, xAI, Gemini, Perplexity, OpenRouter, Groq, DeepSeek, Mistral) | ✅ read (cloud + local) |
 | MCP-Servers | MCP/tool keys (Firecrawl, Brave, Tavily, Exa, …) | ✅ read (cloud + local) |
 | GitHub-CI-CD | GitHub fine-grained PATs, deploy keys, CI tokens | 🟡 local only (Touch ID). **Not** in the cloud agent's scope: a read-only *vault* grant still hands over tokens that can *write* to repos |
-| Agent-GitHub (new, tiny) | only the one token a cloud agent needs: a fine-grained PAT scoped to the specific repos and permissions of that task, with an expiry | ✅ read (cloud), one task-scoped service account per purpose |
+| Agent-GitHub-&lt;task&gt; (new, tiny, **one vault per task**) | only the one token that task needs: a fine-grained PAT scoped to that task's repos and permissions, with an expiry | ✅ read (cloud), by that task's own service account only. Never share one of these vaults between tasks: anyone granted the vault can read every token in it. When a task ends, revoke the PAT, then delete the vault (or remove the old service account's access before reusing it) |
 | Cloud-Infrastructure | Vercel, Cloudflare, GCP/Azure service principals | 🟡 local only (Touch ID), cloud only when a task needs it |
 | Database-Connections | Postgres/Supabase/Neon URLs | 🟡 local only |
 | DevStack-Production | production env | 🟡 local only, per task |
@@ -27,11 +27,13 @@ The keys found in `agent-central-config/.env` and SharePoint `gemini-api.md` mus
 
 ## B. Claude Code on the web (cloud sessions): service account
 1. 1Password (web) → **Developer → Directory → Service Accounts → New service account**. Name it `claude-code-cloud`.
-2. Grant **read-only** access to **AI-Agents and MCP-Servers** only. Leave "create vaults" off. If a cloud task needs GitHub access, put a single task-scoped fine-grained PAT (only the repos and permissions that task needs, with an expiry) in the small **Agent-GitHub** vault and grant that vault to a separate service account for that task. Never grant GitHub-CI-CD to a general cloud agent.
+2. Grant **read-only** access to **AI-Agents and MCP-Servers** only. Leave "create vaults" off. If a cloud task needs GitHub access, create a vault just for that task (e.g. **Agent-GitHub-repo-template**), put one task-scoped fine-grained PAT in it (only the repos and permissions that task needs, with an expiry), and grant that vault to a separate service account for that task alone. Never grant GitHub-CI-CD to a general cloud agent.
 3. Copy the token. It's shown once, so save it into 1Password itself as well (e.g. `Employee/claude-code-cloud service account`).
 4. claude.ai/code → this session's title bar → the cloud **environment menu → Edit**:
    - **Environment variables / API credentials:** add `OP_SERVICE_ACCOUNT_TOKEN` = the token. **Never paste it into chat.**
-   - **Network access:** allow `*.1password.com`, `*.1password.ca`, `*.1password.eu` and `cache.agilebits.com` (the CLI download), or pick a broader access level.
+   - **Network access:** allow `*.1password.com`, `*.1password.ca`, `*.1password.eu`, `cache.agilebits.com` (the CLI download) and
+     `keyserver.ubuntu.com` (the signing key used to verify that download), or pick a broader access level. Without the key server
+     the setup script stops before installing, because it refuses an unverified binary.
    - **Setup script:** add `bash ops/1password/install-op-cli.sh` (or paste its contents).
 5. Start a new session. Claude checks `op whoami` → `op vault list`, which should show only the granted vaults.
 6. Rotate the service-account token every 90 days (set an expiry when you create it) and review its usage in 1Password's activity log.

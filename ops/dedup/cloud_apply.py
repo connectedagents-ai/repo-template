@@ -9,7 +9,7 @@ Safety:
   <remote>:_Dedup-Archive/<stamp>/<original path> in the SAME account, so it stays recoverable and nothing is downloaded.
 - Only acts when the group's keeper is in the same account (a copy that exists only elsewhere is never archived away),
   unless --allow-cross-surface.
-- Before each move the file is re-listed and its provider checksum must still match the plan.
+- Before each move the file AND the group's keeper are re-listed; both checksums must still match the plan.
 - flag-legal and keep rows are never touched. Writes MANIFEST.tsv and restore.sh (undo) into ./cloud-dedup-<stamp>/.
 - Google Drive remotes created read-only (connect_cloud.sh default) can't move files: the script tells you how to
   allow it when you're ready.
@@ -74,6 +74,15 @@ def main():
             planned = {h for h in (r.get("hashes") or "").split(";") if h}
             if not now or not (now & planned):
                 reasons["missing or changed since scan"] += 1
+                continue
+            keeper = keepers.get(r["group"], "")
+            if k_remote:
+                k_now = current_hashes(keeper)
+                if not k_now or not (k_now & planned):  # never archive what may now be the last copy
+                    reasons["keeper missing or changed since scan"] += 1
+                    continue
+            elif not os.path.isfile(keeper):
+                reasons["keeper missing"] += 1
                 continue
             res = subprocess.run(["rclone", "moveto", r["path"], dst], capture_output=True, text=True)
             if res.returncode != 0:

@@ -4,8 +4,9 @@
     python3 find_plaintext_keys.py                       # scan the usual places on this Mac
     python3 find_plaintext_keys.py ~/Code/some-repo      # also scan these folders/files
 
-Prints file, line, variable NAME, whether the file is committed to git, and where to rotate it.
-Never prints a value. Values that are already references (op://…, $(op read …), ${VAR}) are ignored.
+Prints file, line, variable NAME, whether the value is in git history (or the file is merely git-tracked), and where
+to rotate it. Never prints a value. Values that are already references (op://…, $(op read …), ${VAR}) are ignored.
+Exit status: 1 = a key is in git history · 2 = some files could not be read (scan incomplete) · 0 = otherwise.
 """
 import argparse, os, re, subprocess, sys
 from pathlib import Path
@@ -14,9 +15,11 @@ HOME = Path.home()
 # PAT only as its own word part (GITHUB_PAT, PAT_2), so PATH/PYTHONPATH don't count
 NAME = r"[A-Za-z0-9_.-]*(?:KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|PAT(?![A-Za-z]))[A-Za-z0-9_.-]*"
 # NAME=value · export NAME=value · NAME = "value" (TOML) · "name": "value" (JSON)
-ASSIGN = re.compile(rf"""^\s*(?:export\s+)?["']?({NAME})["']?\s*[:=]\s*["']?([^"'\s#,]+)""", re.I)
+# The value is the whole quoted string when quoted ("correct horse battery staple"), else up to whitespace/#/,
+VALUE = r"""(?:"([^"]*)"|'([^']*)'|([^"'\s#,]+))"""
+ASSIGN = re.compile(rf"""^\s*(?:export\s+)?["']?({NAME})["']?\s*[:=]\s*{VALUE}""", re.I)
 # .npmrc registry auth: //registry.npmjs.org/:_authToken=value
-NPMRC = re.compile(r"^\s*(//[^\s=]+:(?:_authToken|_auth|_password))\s*=\s*[\"']?([^\"'\s]+)")
+NPMRC = re.compile(rf"^\s*(//[^\s=]+:(?:_authToken|_auth|_password))\s*=\s*{VALUE}")
 REFERENCE = ("op://", "$(", "${", "$", "<", "your", "xxx", "changeme", "replace", "example", "none", "null", "true", "false")
 SKIP_DIRS = {".git", "node_modules", ".venv", "venv", "__pycache__", "dist", "build", "Library", ".Trash"}
 CANDIDATE = re.compile(r"(^\.env(?!\.example$)|\.env$|rc$|profile$|config\.toml$|settings\.json$|mcp.*\.json$|claude_desktop_config.*\.json$|\.json$)", re.I)
@@ -54,21 +57,28 @@ def is_plaintext(value):
     return len(v) >= 8 and not v.startswith(REFERENCE)
 
 
-def tracked_in_git(path):
-    r = subprocess.run(["git", "-C", str(path.parent), "ls-files", "--error-unmatch", "--", path.name],
-                       capture_output=True, text=True)
-    return r.returncode == 0
+def git_status(path, value):
+    """'committed' if this value is in the file's git history, 'tracked' if git tracks the file, else ''.
+    The value is only passed to git in-process; it is never printed or logged."""
+    d, name = str(path.parent), path.name
+    if subprocess.run(["git", "-C", d, "ls-files", "--error-unmatch", "--", name], capture_output=True).returncode != 0:
+        return ""
+    hist = subprocess.run(["git", "-C", d, "log", "--all", "--format=%H", "-S", value, "--", name],
+                          capture_output=True, text=True)
+    return "committed" if hist.stdout.strip() else "tracked"
 
 
 def scan_file(path):
-    try:
-        with open(path, encoding="utf-8", errors="replace") as f:
-            for n, line in enumerate(f, 1):
-                m = ASSIGN.match(line) or NPMRC.match(line)
-                if m and is_plaintext(m.group(2)):
-                    yield n, m.group(1)
-    except OSError:
-        return
+    """[(line, name, value)]. Raises OSError if the file can't be read, so the caller can report the gap."""
+    found = []
+    with open(path, encoding="utf-8", errors="replace") as f:
+        for n, line in enumerate(f, 1):
+            m = ASSIGN.match(line) or NPMRC.match(line)
+            if m:
+                value = next(v for v in m.groups()[1:] if v is not None)
+                if is_plaintext(value):
+                    found.append((n, m.group(1), value))
+    return found
 
 
 def candidates(root, max_depth=5):
@@ -92,26 +102,37 @@ def main():
         p for pat in ("agent-central-config", "*/agent-central-config", "*/*/agent-central-config")
         for p in (HOME / "Code").glob(pat) if p.is_dir()]
     targets += [p.expanduser() for p in a.paths]
-    hits, seen = [], set()
+    hits, seen, unreadable = [], set(), []
     for t in targets:
         if not t.exists():
             continue
         for f in candidates(t):
-            if f in seen or f.stat().st_size > 2_000_000:
+            if f in seen:
                 continue
             seen.add(f)
-            for line, name in scan_file(f):
-                hits.append((str(f).replace(str(HOME), "~", 1), line, name, tracked_in_git(f)))
-    if not hits:
-        print("No plain-text keys found in the places scanned. 🎉")
-        return
-    print(f"Found {len(hits)} plain-text key(s). Values are NOT shown.\n")
-    for f, line, name, in_git in hits:
-        flag = "  ⚠ COMMITTED TO GIT: treat as leaked" if in_git else ""
-        print(f"- {name}\n    in {f} (line {line}){flag}\n    rotate at: {rotate_url(name)}")
-    print("\nFor each one: 1) make a new key at the link, 2) save it in 1Password, 3) replace the line with an op:// reference,"
-          " 4) delete the old key at the provider.")
-    sys.exit(1 if any(h[3] for h in hits) else 0)
+            short = str(f).replace(str(HOME), "~", 1)
+            try:
+                if f.stat().st_size > 2_000_000:
+                    continue
+                found = scan_file(f)
+            except OSError as e:  # broken symlink, permission denied, vanished file
+                unreadable.append(f"{short} ({e.strerror or type(e).__name__})")
+                continue
+            hits += [(short, line, name, git_status(f, value)) for line, name, value in found]
+    flags = {"committed": "  ⚠ IN GIT HISTORY: treat as leaked",
+             "tracked": "  ⚠ file is tracked by git: check it was never committed (git log -p -- <file>)"}
+    if hits:
+        print(f"Found {len(hits)} plain-text key(s). Values are NOT shown.\n")
+        for f, line, name, status in hits:
+            print(f"- {name}\n    in {f} (line {line}){flags.get(status, '')}\n    rotate at: {rotate_url(name)}")
+        print("\nFor each one: 1) make a new key at the link, 2) save it in 1Password, 3) replace the line with an op:// reference,"
+              " 4) delete the old key at the provider.")
+    else:
+        print("No plain-text keys found in the files that could be read.")
+    if unreadable:
+        print(f"\n⚠ INCOMPLETE: {len(unreadable)} file(s) could not be read, so they were not checked:")
+        print("\n".join(f"  - {u}" for u in unreadable))
+    sys.exit(1 if any(h[3] == "committed" for h in hits) else 2 if unreadable else 0)
 
 
 if __name__ == "__main__":

@@ -128,7 +128,7 @@ bash "$OPS/mac-cleanup/archive_claude_files.sh" --prune-mcp > "$OUTDIR/preview-a
 echo "  → preview-*.txt"
 
 step "6/7 Cloud stack (uses logged-in CLIs; skips the rest)"
-if OUT="$OUTDIR/cloud-inventory.md" bash "$OPS/cloud-inventory/inventory_cloud.sh" >>"$LOG" 2>&1; then
+if INCLUDE_1PASSWORD="$CONSENT_4B" OUT="$OUTDIR/cloud-inventory.md" bash "$OPS/cloud-inventory/inventory_cloud.sh" >>"$LOG" 2>&1; then
   echo "  → $OUTDIR/cloud-inventory.md"
 else
   incomplete "cloud inventory" "cloud-inventory.md is missing or partial"

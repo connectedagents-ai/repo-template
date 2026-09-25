@@ -225,7 +225,6 @@ for spec in \
   "Grok|$HOME/.grok/workspaces" \
   "Grok|$HOME/.grok/projects" \
   "Devin|$HOME/.devin" \
-  "Warp|$HOME/.warp" \
   "Devin|$HOME/Devin" \
   "Copilot|$HOME/Documents/Copilot" \
   "Copilot|$HOME/Library/CloudStorage/OneDrive-*/Copilot"; do

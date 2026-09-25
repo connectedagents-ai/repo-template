@@ -1,4 +1,5 @@
 import importlib.util, unittest
+from unittest import mock
 from tests.helpers import OPS
 
 spec = importlib.util.spec_from_file_location("discover_accounts", OPS / "client-discovery/discover_accounts.py")
@@ -18,3 +19,20 @@ class AiProjectMatchTest(unittest.TestCase):
         self.assertTrue(discover.in_scope("Me@iCloud.com", None))
         self.assertTrue(discover.in_scope("Me@iCloud.com", {"me@icloud.com"}))
         self.assertFalse(discover.in_scope("other@x.com", {"me@icloud.com"}))
+
+
+class AppleMailScopeTest(unittest.TestCase):
+    def test_only_schedule_a_accounts_reach_alerts_and_hits_and_unknown_mailboxes_are_reported(self):
+        rows = [("imap://ACC1/INBOX", "alerts@godaddy.com", "Your domain will expire", 1700000000),
+                ("imap://ACC2/INBOX", "alerts@godaddy.com", "Your domain will expire", 1700000000),
+                ("imap://UNKNOWN/INBOX", "alerts@godaddy.com", "Your domain will expire", 1700000000)]
+        hits = []
+        with mock.patch.object(discover.glob, "glob", return_value=["/x/V10/MailData/Envelope Index"]), \
+                mock.patch.object(discover, "mail_accounts_map",
+                                  return_value={"ACC1": ("me@icloud.com", "iCloud"), "ACC2": ("other@x.com", "IMAP")}), \
+                mock.patch.object(discover, "read_sqlite", return_value=rows):
+            acct_rows, alerts, _, unresolved = discover.apple_mail(lambda *a, **k: hits.append(a), {"me@icloud.com"})
+        self.assertEqual(set(acct_rows), {"me@icloud.com"})
+        self.assertEqual([a[1] for a in alerts], ["me@icloud.com"])
+        self.assertEqual(len(hits), 1)
+        self.assertEqual(unresolved, {"UNKNOWN"})

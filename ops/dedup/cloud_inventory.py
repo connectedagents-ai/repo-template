@@ -78,10 +78,11 @@ def main():
         a.remote += ":"
     name = a.remote.split(":", 1)[0]
     surface = re.sub(r"[^A-Za-z0-9._-]", "_", name)
+    slug = re.sub(r"[^A-Za-z0-9._-]", "_", a.remote.rstrip(":/"))  # one file per remote+folder, so scans don't overwrite
     prefix = a.remote if a.remote.endswith((":", "/")) else a.remote + "/"
     legal = re.compile(a.legal_pattern, re.I)
     a.out.mkdir(parents=True, exist_ok=True)
-    out = a.out / f"inventory-{surface}.csv"
+    out = a.out / f"inventory-{slug}.csv"
     lines = open(a.from_json, encoding="utf-8") if a.from_json else lsjson_lines(a.remote)
     n = hashed = flagged = skipped = 0
     with open(out, "w", newline="", encoding="utf-8") as f:

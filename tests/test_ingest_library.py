@@ -55,6 +55,23 @@ class IngestLibraryTest(TempDirTest):
         self.assertIn("New-title", chats[0].name)
         self.assertIn("héllo ✓", chats[0].read_text(encoding="utf-8"))
 
+    def test_same_chatgpt_export_is_split_for_each_account(self):
+        self.exp.mkdir()
+        (self.exp / "conversations.json").write_text(chatgpt_export([("c1", "Plan", "hi")]), encoding="utf-8")
+        self.ingest(self.exp, account="personal")
+        self.ingest(self.exp, account="team")
+        for acct in ("personal", "team"):
+            self.assertEqual(len(list((self.lib / f"sources/chatgpt/{acct}/chats").glob("*.md"))), 1)
+
+    def test_skill_whose_entry_point_is_a_symlink_is_skipped(self):
+        skill = self.exp / "linked"
+        skill.mkdir(parents=True)
+        (self.tmp / "real.md").write_text("x")
+        (skill / "SKILL.md").symlink_to(self.tmp / "real.md")
+        r = self.ingest(self.exp)
+        self.assertIn("skip-skill", r.stdout)
+        self.assertFalse((self.lib / "skills/linked").exists())
+
     def test_zip_larger_than_free_space_is_refused(self):
         z = self.tmp / "export.zip"
         with zipfile.ZipFile(z, "w", zipfile.ZIP_DEFLATED) as f:
