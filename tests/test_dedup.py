@@ -75,3 +75,16 @@ class DedupPipelineTest(TempDirTest):
         (manifest,) = (self.tmp / "ar").glob("*/MANIFEST.tsv")
         self.assertEqual(len(manifest.read_text().splitlines()), 2)
         self.assertTrue((manifest.parent / "restore.sh").stat().st_mode & 0o100)
+
+    def test_the_clean_name_is_kept_and_numbered_copies_are_archived(self):
+        _, run = self.plan({"deep/folder/Report.pdf": "x" * 50, "Report (1).pdf": "x" * 50,
+                            "Report 2.pdf": "x" * 50, "Report-copy-3.pdf": "x" * 50})
+        actions = {r["path"].rsplit("/", 1)[-1]: r["action"] for r in self.rows(run)}
+        self.assertEqual(actions, {"Report.pdf": "keep", "Report (1).pdf": "archive",
+                                   "Report 2.pdf": "archive", "Report-copy-3.pdf": "archive"})
+
+    def test_numbered_copies_with_different_content_go_to_review_not_archive(self):
+        _, run = self.plan({"Notes.txt": "first draft", "Notes (1).txt": "a later, different draft"})
+        self.assertEqual(self.rows(run), [])
+        with open(run / "near-duplicates.csv", newline="") as f:
+            self.assertEqual(len(list(csv.DictReader(f))), 2)
