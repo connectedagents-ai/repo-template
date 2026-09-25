@@ -43,7 +43,7 @@ ORG="$1"
 command -v gh >/dev/null || { echo "install the GitHub CLI first: brew install gh" >&2; exit 1; }
 
 LOG="github-setup-$(date +%Y%m%d-%H%M%S).log"
-FAILS="$(mktemp)"; trap 'rm -f "$FAILS"' EXIT
+FAILS="$(mktemp)"; ERR="$(mktemp)"; trap 'rm -f "$FAILS" "$ERR"' EXIT
 # progress goes to the screen (stderr) and the log; stdout carries only API responses, so $(api …) captures JSON
 log() { printf '%s\n' "$*" >> "$LOG"; printf '%s\n' "$*" >&2; }
 
@@ -54,10 +54,11 @@ api() {
     log "WOULD $method $path${body:+  $(printf '%s' "$body" | tr -d '\n' | tr -s ' ')}"
     return 0
   fi
-  if [ -n "$body" ]; then out="$(printf '%s' "$body" | gh api -X "$method" "$path" --input - 2>&1)"
-  else out="$(gh api -X "$method" "$path" 2>&1)"; fi
+  # stderr is kept apart, so a warning can never end up inside the JSON a caller parses
+  if [ -n "$body" ]; then out="$(printf '%s' "$body" | gh api -X "$method" "$path" --input - 2>"$ERR")"
+  else out="$(gh api -X "$method" "$path" 2>"$ERR")"; fi
   if [ $? -eq 0 ]; then log "ok    $method $path"; printf '%s' "$out"
-  else log "FAIL  $method $path: $(printf '%s' "$out" | tr '\n' ' ' | cut -c1-300)"; echo "$method $path" >> "$FAILS"; return 1; fi
+  else log "FAIL  $method $path: $(cat "$ERR" | tr '\n' ' ' | cut -c1-300)"; echo "$method $path" >> "$FAILS"; return 1; fi
 }
 
 # ---- read-only checks (always run) ----
@@ -105,7 +106,11 @@ CONFIG_BODY='{
 }'
 CID="$(gh api "orgs/$ORG/code-security/configurations" --jq '.[] | select(.name == "standard") | .id' 2>/dev/null)"
 if [ -n "$CID" ]; then api PATCH "orgs/$ORG/code-security/configurations/$CID" "$CONFIG_BODY" >/dev/null
-elif [ "$APPLY" = 1 ]; then CID="$(api POST "orgs/$ORG/code-security/configurations" "$CONFIG_BODY" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null)"
+elif [ "$APPLY" = 1 ]; then
+  if resp="$(api POST "orgs/$ORG/code-security/configurations" "$CONFIG_BODY")"; then
+    CID="$(printf '%s' "$resp" | python3 -c 'import json,sys; print(json.load(sys.stdin)["id"])' 2>/dev/null)"
+    [ -n "$CID" ] || { log "FAIL  created the configuration but could not read its id, so it is NOT attached to any repo: re-run the script"; echo "attach code security configuration" >> "$FAILS"; }
+  fi
 else api POST "orgs/$ORG/code-security/configurations" "$CONFIG_BODY"; CID="<new id>"; fi
 if [ -n "$CID" ]; then
   api POST "orgs/$ORG/code-security/configurations/$CID/attach" '{"scope": "all"}' >/dev/null

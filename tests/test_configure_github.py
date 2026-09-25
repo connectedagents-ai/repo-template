@@ -18,7 +18,7 @@ case "$*" in
   "api orgs/acme/rulesets --jq"*) ;;
   "api orgs/acme/copilot/billing"*) exit 1 ;;
   "repo list"*) printf 'alpha\nbeta\n' ;;
-  "api -X POST orgs/acme/code-security/configurations --input -") echo '{"id": 42}' ;;
+  "api -X POST orgs/acme/code-security/configurations --input -") echo "warning: slow network" >&2; echo "${CONFIG_RESP:-{\"id\": 42\}}" ;;
   "api -X"*) echo '{}' ;;
   *) exit 1 ;;
 esac
@@ -26,7 +26,7 @@ esac
 
 
 class ConfigureGithubTest(TempDirTest):
-    def run_script(self, *args, role="admin", fail_on=""):
+    def run_script(self, *args, role="admin", fail_on="", config_resp=None):
         b = self.tmp / "bin"
         b.mkdir(exist_ok=True)
         gh = b / "gh"
@@ -34,6 +34,8 @@ class ConfigureGithubTest(TempDirTest):
         gh.chmod(gh.stat().st_mode | stat.S_IEXEC)
         self.gh_log = self.tmp / "gh.log"
         env = {**os.environ, "PATH": f"{b}:/usr/bin:/bin", "GH_LOG": str(self.gh_log), "ROLE": role, "FAIL_ON": fail_on}
+        if config_resp is not None:
+            env["CONFIG_RESP"] = config_resp
         r = subprocess.run(["bash", str(SCRIPT), *args, "acme"], capture_output=True, text=True, env=env, cwd=self.tmp)
         return r, self.gh_log.read_text() if self.gh_log.exists() else ""
 
@@ -74,3 +76,9 @@ class ConfigureGithubTest(TempDirTest):
         self.assertEqual(r.returncode, 1)
         self.assertIn("not an owner", r.stderr)
         self.assertNotIn("api -X", calls)
+
+    def test_an_unreadable_configuration_id_is_a_failure_not_a_silent_skip(self):
+        r, calls = self.run_script("--apply", config_resp="not json")
+        self.assertEqual(r.returncode, 1)
+        self.assertIn("NOT attached", r.stderr)
+        self.assertNotIn("/attach", calls)
