@@ -1,5 +1,21 @@
 # Connected-Energy-AI: repo review sheet
 
+**Connected-Energy-AI (CEA) holds most of the valuable code.** It is the main source for the new org, not a leftover:
+its active repos move first and with the most care, and every repo is backed up in full before anything moves.
+
+## Step 0: full backup on the SSD (before anything else)
+Every CEA repo, including all branches, tags and history, cloned as a mirror onto the Extreme SSD. It only reads from
+GitHub and writes to the SSD, never to the Mac. Re-running it updates the backup. In Terminal on your Mac:
+```bash
+DEST="/Volumes/Extreme SSD/github-backup/Connected-Energy-AI"; mkdir -p "$DEST" && cd "$DEST" || exit 1
+gh repo list Connected-Energy-AI --limit 500 --json name -q '.[].name' | while read -r r; do
+  if [ -d "$r.git" ]; then git -C "$r.git" remote update --prune; else gh repo clone "Connected-Energy-AI/$r" "$r.git" -- --mirror; fi
+done
+echo "Backed up: $(ls -d *.git | wc -l | tr -d ' ') repos, $(du -sh . | cut -f1)"
+```
+It should report 80 repos. Some repos (for example `agent-central-config`) have keys and case files in their history,
+so this backup is sensitive: keep the SSD private, and use an encrypted APFS volume if you can.
+
 **Rule:** nothing in Connected-Energy-AI (CEA) is archived, transferred or deleted until its row is decided here and its
 open work (PRs, unmerged branches) is merged or consciously dropped. Destinations follow `docs/GITHUB-BLUEPRINT.md` §3.
 Inventory taken 2026-09-25: **80 repos**. 39 are active, 20 are already archived, and 21 are forks.
