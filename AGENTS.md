@@ -47,3 +47,5 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Ask before anything destructive or outward-facing: deleting data, transferring or archiving repos, force-pushing, sending messages, spending money.
 - Don't widen scope. If you notice something unrelated, mention it in the PR instead of fixing it silently.
 - Report results honestly: what ran, what passed, what didn't, what you skipped.
+- For every step the owner does themselves, give the exact page as a full, visible URL (not only link text) and a
+  copy-paste command or script. The owner is a beginner: no step should need them to find a setting or write code.

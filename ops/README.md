@@ -20,7 +20,9 @@ Everything here is **dry-run by default**, copies or archives instead of deletin
 | 3e | Microsoft tenants: finish the netzerolending.io move (mail done 2026-05-21, files not yet), personal OneDrive, retire the old tenant | `microsoft/TENANT-MIGRATION.md` |
 | 3d | Wire **Codex + Grok CLI** (and every AI tool) to one core MCP set, one install per CLI, and audit agent access (bot vaults, AI OAuth apps) | `mcp/README.md` · `mcp/park_mcp_servers.py` |
 | 4 | Reset global agent config | copy `mac-cleanup/templates/CLAUDE.md` + `settings.json` into `~/.claude/`. Configure the other CLIs and IDEs per `../docs/GITHUB-SETUP.md` §7 |
-| 5 | Set up the GitHub org, apps, Copilot and CLI | preview `bash github-setup/configure_github.sh <ORG>`, then `--apply --create-repos` · the web-only steps in `../docs/GITHUB-SETUP.md` §2–§5 |
+| 4b | Review Connected-Energy-AI before anything moves: unmerged PRs/branches, destination per repo | `bash github-consolidation/review_open_work.sh Connected-Energy-AI` · `github-consolidation/CEA-REVIEW.md` |
+| 5 | Set up the GitHub org, apps, Copilot and CLI | preview `bash github-setup/configure_github.sh powerconnectionai`, then `--apply --create-repos` · the web-only steps in `../docs/GITHUB-SETUP.md` §2–§5 |
+| 5b | Let Claude Cowork do the steps with you (approvals and logins stay with you) | paste the prompts in `cowork/TASKS.md`, one at a time |
 | 6 | Move every other org or account into `connectedagents-ai` | `bash github-consolidation/migrate_to_connectedagents.sh Connected-Energy-AI` → `--apply` |
 | 7 | Collapse ~280 repos into ~10 | `github-consolidation/MIGRATION-PLAN.md` step 2 · `bash github-consolidation/merge_into_monorepo.sh --apply <target> <owner/src> <path>` → PR → archive the source |
 | 8 | Export Perplexity, ChatGPT/OpenAI, Grok/xAI, Copilot (3 accounts), Google (Gemini, NotebookLM, AI Studio), Antigravity, Claude → central library | `ai-library/README.md` · `python3 ai-library/ingest_library.py --source <tool> --account <label> <export>` |
