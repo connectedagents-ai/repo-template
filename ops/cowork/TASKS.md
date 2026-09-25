@@ -5,6 +5,14 @@ Chrome** (https://claude.ai/chrome) and Terminal commands. It stops and asks whe
 login or a 2FA code. Paste the **ground rules** first, then one task at a time. Each task ends with a short report you can
 paste back into any Claude chat.
 
+## Option: Claude Code driving your own Edge and Chrome
+If you'd rather use Claude Code in Terminal (reachable from your phone) with Edge and Chrome, run once:
+```bash
+cd ~/Code/repo-template && git pull && bash ops/cowork/connect_browsers.sh
+```
+It opens Edge and Chrome in their own windows, connected to Claude Code. Sign in to GitHub and Google there once (the
+logins stay). Then start `claude remote-control` in the same folder and paste the ground rules and tasks below.
+
 ## Ground rules (paste first, once per Cowork session)
 ```
 You are working on my Mac with me watching. Rules for everything I ask today:
