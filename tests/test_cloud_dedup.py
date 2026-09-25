@@ -121,6 +121,25 @@ class CloudApplyKeeperTest(TempDirTest):
         self.assertFalse((self.tmp / "fake/moves").exists())
 
 
+    def test_duplicate_is_not_archived_when_the_local_keeper_was_edited(self):
+        keeper = self.tmp / "keep.pdf"
+        keeper.write_bytes(BODY)
+        plan = self.tmp / "plan.csv"
+        with open(plan, "w", newline="") as f:
+            w = csv.writer(f)
+            w.writerow(["group", "sha256", "size", "action", "surface", "path", "hashes"])
+            w.writerow([1, "x", len(BODY), "keep", "mac-local", str(keeper), f"md5:{MD5}"])
+            w.writerow([1, "x", len(BODY), "archive", "gdrive-work", "gdrive-work:D/a.pdf", f"md5:{MD5}"])
+        env = fake_rclone(self.tmp, {"gdrive-work:D/a.pdf": [{"Path": "a.pdf", "Hashes": {"md5": MD5}}]})
+        keeper.write_bytes(BODY + b"edited")
+        r = self.run_py(CLOUD_APPLY, "--plan", plan, "--out", self.tmp, "--apply", "--allow-cross-surface", env=env)
+        self.assertIn("keeper missing or changed since scan", r.stdout)
+        self.assertFalse((self.tmp / "fake/moves").exists())
+        keeper.write_bytes(BODY)
+        self.run_py(CLOUD_APPLY, "--plan", plan, "--out", self.tmp, "--apply", "--allow-cross-surface", env=env)
+        self.assertEqual(len((self.tmp / "fake/moves").read_text().splitlines()), 1)
+
+
 class InventoryFilesTest(TempDirTest):
     def test_folder_scans_of_one_account_keep_separate_files_and_overlaps_count_once(self):
         run = self.tmp / "run"

@@ -85,7 +85,8 @@ do_choice() {
        [ -n "$failed" ] && warn "These steps reported problems:$failed (see their reports)"
        say "All done. Reports are in: $OUT"
        open "$OUT" 2>/dev/null || true
-       echo "  Next: open keys-to-rotate.txt first and rotate those keys. Then paste the other reports into Claude." ;;
+       echo "  Next: open keys-to-rotate.txt first and rotate those keys. Then paste the other reports into Claude."
+       [ -z "$failed" ] ;;
     q|Q) exit 0 ;;
     *) warn "Please type one of the numbers shown." ;;
   esac

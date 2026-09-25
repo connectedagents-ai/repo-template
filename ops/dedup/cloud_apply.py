@@ -18,12 +18,23 @@ import argparse, csv, datetime, json, os, re, shlex, subprocess, sys
 from collections import defaultdict
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from dedup_merge import HASHERS, file_hashes  # noqa: E402
+
 REMOTE = re.compile(r"^([A-Za-z0-9._ -]+):(.+)$")
 
 
 def split_remote(path):
     m = REMOTE.match(path)
     return (m.group(1), m.group(2)) if m and not path.startswith("/") else (None, None)
+
+
+def local_matches(path, planned):
+    """True if the local file still has one of the planned checksums (computed with the same algorithms)."""
+    types = tuple(sorted({h.split(":", 1)[0] for h in planned} & set(HASHERS)))
+    if not types or not os.path.isfile(path):
+        return False
+    return bool({f"{t}:{v}" for t, v in file_hashes(path, types).items()} & planned)
 
 
 def current_hashes(path):
@@ -81,8 +92,8 @@ def main():
                 if not k_now or not (k_now & planned):  # never archive what may now be the last copy
                     reasons["keeper missing or changed since scan"] += 1
                     continue
-            elif not os.path.isfile(keeper):
-                reasons["keeper missing"] += 1
+            elif not local_matches(keeper, planned):  # keeper on this Mac: must still exist unchanged
+                reasons["keeper missing or changed since scan"] += 1
                 continue
             res = subprocess.run(["rclone", "moveto", r["path"], dst], capture_output=True, text=True)
             if res.returncode != 0:
