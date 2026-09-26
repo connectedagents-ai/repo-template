@@ -55,7 +55,16 @@ Choose the fastest, lowest-token path for the job. **Default to a terminal scrip
 Python/bash script); use browser clicking only for what has no CLI or API (billing, some settings, OAuth approval).
 Batch similar steps into one script instead of doing them one by one.
 
-Every job an agent does for the owner in a browser, a terminal or by computer control follows three steps:
+Size the job first; the smallest size that fits wins:
+- **Just do it**: read-only or trivially reversible local work (look something up, run a status check, list files).
+  Report in one line.
+- **Quick confirm**: a one-off, simple job (about 3 steps or fewer, one target) that isn't destructive, paid or
+  outward-facing. One line of intent and target ("Rename X to Y in repo Z. OK?"), answered yes or no by button or
+  voice. Afterwards, one line of result with proof.
+- **Full checklist** (below): several steps or targets, anything that deletes, revokes, pays, sends, publishes or
+  touches credentials, anything that can't be undone, or a tool the agent hasn't checked yet.
+
+A full-checklist job follows three steps:
 1. **Pre-job checklist, shown before starting.** Goal and done-when · every page (full URL), command and file it will
    touch · tools it needs, checked to be present and signed in (e.g. `gh auth status`, browser connected, `python3`,
    `node`, the SSD mounted), installing what's missing only with a copy-paste command the owner approves · which steps

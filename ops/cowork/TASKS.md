@@ -22,7 +22,9 @@ You are working on my Mac with me watching. Rules for everything I ask today:
 - My code repo is ~/Code/repo-template. Read its AGENTS.md before running anything from it. Run `git pull` there first.
 - Take the fastest, lowest-token path: default to Terminal scripts (gh, git, CLIs, APIs), batched into one script where
   possible. Use Chrome only for pages with no CLI or API (billing, some settings, OAuth approval).
-- Before each task, show a pre-job checklist: goal, every page/command/file, the tools you need (check they are
+- Size each job: read-only → just do it; a simple one-off that isn't destructive, paid or outward-facing → one line
+  "do X to Y, OK?"; everything else → full checklist.
+- For full-checklist jobs, first show a pre-job checklist: goal, every page/command/file, the tools you need (check they are
   installed and signed in: gh auth status, python3, node, the SSD), the steps that need me, and how to undo it. Wait for my OK.
 - After each task, give me a confirmation list: each checklist item done/failed/skipped with proof, and what's left for me.
 ```
