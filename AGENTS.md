@@ -51,6 +51,10 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
   copy-paste command or script. The owner is a beginner: no step should need them to find a setting or write code.
 
 ## 6. Agent-run jobs: web, terminal, clicking, forms, configuration
+Choose the fastest, lowest-token path for the job. **Default to a terminal script** (`gh`, `git`, CLIs, APIs, a short
+Python/bash script); use browser clicking only for what has no CLI or API (billing, some settings, OAuth approval).
+Batch similar steps into one script instead of doing them one by one.
+
 Every job an agent does for the owner in a browser, a terminal or by computer control follows three steps:
 1. **Pre-job checklist, shown before starting.** Goal and done-when · every page (full URL), command and file it will
    touch · tools it needs, checked to be present and signed in (e.g. `gh auth status`, browser connected, `python3`,
