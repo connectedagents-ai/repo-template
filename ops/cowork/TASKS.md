@@ -16,7 +16,8 @@ logins stay). Then start `claude remote-control` in the same folder and paste th
 ## Ground rules (paste first, once per Cowork session)
 ```
 You are working on my Mac with me watching. Rules for everything I ask today:
-- Stop and ask me before anything that deletes, revokes, archives, pays, sends or publishes. Show me exactly what you will do first.
+- You may act for me without asking on everything in AGENTS.md §7 (previews, audits, tests, branches, PRs, archiving
+  with a restore script). Stop and ask before anything that deletes, revokes, pays, sends or publishes.
 - I type every password, 2FA code and passkey myself. When a login or approval appears, stop and tell me.
 - Never copy large data onto the Mac's internal disk. Backups and reports go on "/Volumes/Extreme SSD". If the SSD is not mounted, stop.
 - My code repo is ~/Code/repo-template. Read its AGENTS.md before running anything from it. Run `git pull` there first.
@@ -27,6 +28,21 @@ You are working on my Mac with me watching. Rules for everything I ask today:
 - For full-checklist jobs, first show a pre-job checklist: goal, every page/command/file, the tools you need (check they are
   installed and signed in: gh auth status, python3, node, the SSD), the steps that need me, and how to undo it. Wait for my OK.
 - After each task, give me a confirmation list: each checklist item done/failed/skipped with proof, and what's left for me.
+```
+
+## Start here: one paste into Claude Code (Local) or Cowork
+```
+Read ~/Code/repo-template/AGENTS.md (sections 5–7) and ~/Code/repo-template/ops/cowork/TASKS.md, and follow the ground
+rules in TASKS.md for this whole session. Then work through the tasks in order, starting with Task 0. Size each job per
+AGENTS.md §6, act on your own within §7, and ask me only where the rules say to. After each task, give me the
+confirmation list, then move straight on to the next task.
+```
+
+## Task 0: make this Mac agent-ready (5 min)
+```
+cd ~/Code/repo-template && git pull && bash ops/cowork/bootstrap_mac.sh
+Show me the checklist. Walk me through each NEEDS YOU line (I type logins myself). Then run it again with --apply and
+show me what it installed. Then: bash ops/cowork/connect_browsers.sh
 ```
 
 ## Task 1: back up Connected-Energy-AI to the SSD (10–30 min, read-only on GitHub)
@@ -122,4 +138,22 @@ prints. Legal-flagged files are never touched. Tell me where restore.sh was writ
    Show me every FAIL line.
 3. Open https://github.com/connectedagents-ai/repo-template/compare/main...claude/code-chairman-repo-org-ocoe3d and
    create the pull request titled "chore: rules, ops tools and security scan". I review and merge it.
+```
+
+## Task 9: clean up the Mac and dev tools (preview first)
+```
+cd ~/Code/repo-template/ops
+1. bash mac-cleanup/audit_claude_files.sh  → summarize the report (~/claude-audit-*.md): biggest clutter, duplicate tool
+   installs, stray repos outside ~/Code.
+2. bash mac-cleanup/collect_ai_workspaces.sh  → show the preview, then --apply (copies only).
+3. bash mac-cleanup/archive_claude_files.sh  → show the preview, then --apply (moves to ~/Archive with restore.sh).
+4. Keep one install of each CLI (claude, codex, gh, node, python): list duplicates with `which -a <tool>` and propose
+   which to remove; remove only after my OK.
+```
+
+## Task 10: refactor code and templates (on branches, I merge)
+```
+Use the Product Rebuild Blueprint (https://claude.ai/code/artifact/6d23ff76-d353-43d1-9b3a-d9a64000eee5) and
+docs/GITHUB-BLUEPRINT.md. For the milestone I name, create a branch, make the change, run make lint and make test,
+and open a PR with the confirmation list in its description. One milestone per PR.
 ```

@@ -73,3 +73,13 @@ A full-checklist job follows three steps:
 3. **Confirmation list after finishing.** Each checklist item marked done / failed / skipped, with proof (the command
    output, the page state, a screenshot) · what changed and where · anything left for the owner, as full URLs and
    copy-paste commands.
+
+## 7. Standing authority: what agents may do for the owner without asking
+Agents working for the owner on the Mac, dev tools, repos and templates may do these **without asking** (report after):
+read anything except secrets · run previews, dry-runs, audits, `make lint`, `make test` · install the rule files and
+tools listed by `ops/cowork/bootstrap_mac.sh` · create branches, commit, push agent branches and open PRs · refactor
+code on a branch (the owner merges) · move clutter into `~/Archive/<topic>-<YYYYMMDD>/` with a restore script.
+**Always ask first** (quick confirm or full checklist, §6): deleting anything, merging to `main`, force-pushing,
+changing account, billing, org or security settings, revoking access, sending or publishing, and anything touching
+client or case data. **Who decides:** agents plan, prepare, track and build; the owner sets priorities and makes the
+legal, money and external calls ("the agent prepares, the owner decides").
