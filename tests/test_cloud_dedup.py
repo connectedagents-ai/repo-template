@@ -247,3 +247,14 @@ class CloudReviewFixesTest(TempDirTest):
         self.assertIn("inventory-googledrive-b-x.com.csv", names)
         self.assertIn("inventory-onedrive-personal.csv", names)
         self.assertNotIn("inventory-googledrive-a-x.com.csv", names)
+
+    def test_icloud_drive_can_be_left_out(self):
+        home, out = self.tmp / "home", self.tmp / "out"
+        icloud = home / "Library/Mobile Documents/com~apple~CloudDocs"
+        icloud.mkdir(parents=True)
+        (icloud / "f.txt").write_text("x")
+        for skip, expected in (("0", True), ("1", False)):
+            env = {**os.environ, "HOME": str(home), "OUT": str(out / skip), "SKIP_ICLOUD": skip}
+            subprocess.run(["bash", str(OPS / "dedup/run_dedup.sh")], env=env, capture_output=True, text=True, check=True)
+            (run,) = (out / skip).iterdir()
+            self.assertEqual((run / "inventory-icloud-drive.csv").exists(), expected)

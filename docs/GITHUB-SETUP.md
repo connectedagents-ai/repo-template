@@ -1,14 +1,14 @@
 # GitHub setup: every setting, connection and tool
 
-`<ORG>` below is the new org from `docs/GITHUB-BLUEPRINT.md` (recommended: `powerconnection`). Everything that GitHub's API
+`powerconnectionai` is the new org from `docs/GITHUB-BLUEPRINT.md` (**https://github.com/powerconnectionai**). Everything that GitHub's API
 can set is done by one script (§1). The rest must be clicked in the web UI (§2–§5). Do the sections in order. ☐ = a checkbox for you.
 
 ## 1. Org and repo settings: one script (preview first)
 ```bash
-cd ~/Code/<ORG>/config            # or wherever this repo is cloned
+cd ~/Code/powerconnectionai/config            # or wherever this repo is cloned
 gh auth refresh -h github.com -s admin:org
-bash ops/github-setup/configure_github.sh <ORG>                          # preview: lists every change, makes none
-bash ops/github-setup/configure_github.sh --apply --create-repos <ORG>   # apply, and create the blueprint repos
+bash ops/github-setup/configure_github.sh powerconnectionai                          # preview: lists every change, makes none
+bash ops/github-setup/configure_github.sh --apply --create-repos powerconnectionai   # apply, and create the blueprint repos
 ```
 It sets the following, and is safe to re-run (for example after adding repos):
 | Area | Setting |
@@ -24,7 +24,7 @@ It sets the following, and is safe to re-run (for example after adding repos):
 The script prints a FAIL line for anything your plan doesn't include (see §8) and carries on. The `.github` repo is public on
 purpose: GitHub only reads org-wide default templates and the org profile from a public `.github`.
 
-## 2. Web-only settings (github.com/organizations/<ORG>/settings)
+## 2. Web-only settings (github.com/organizations/powerconnectionai/settings)
 - ☐ **Authentication security:** require two-factor authentication for everyone.
 - ☐ **Billing and plans → Spending limits:** Actions and Codespaces **$0** (nothing is charged beyond the included minutes until you raise it).
 - ☐ **Third-party access → OAuth app policy:** *Access restricted*. Approve only the apps in §3 as they ask.
@@ -33,14 +33,14 @@ purpose: GitHub only reads org-wide default templates and the org profile from a
 - ☐ **Repository → Repository transfers:** off (the fresh start copies repos in instead of transferring them).
 - ☐ **Profile:** add the org avatar and a short description; the `.github` repo's `profile/README.md` becomes the org home page.
 
-## 3. Apps and cloud agents: install each on `<ORG>` only
+## 3. Apps and cloud agents: install each on `powerconnectionai` only
 | Tool | Where | Settings |
 |---|---|---|
-| **Claude** (Claude Code on the web, `@claude` in issues/PRs) | github.com/apps/claude → Configure → `<ORG>` → *All repositories* | Web sessions use it to push and open PRs. `@claude` in GitHub runs `.github/workflows/claude.yml` (needs the secret in §5) |
-| **Linear** | Linear → Settings → Integrations → GitHub → connect `<ORG>` | Links branches/PRs that carry the issue key (`POW-123`) and closes the issue on merge |
+| **Claude** (Claude Code on the web, `@claude` in issues/PRs) | github.com/apps/claude → Configure → `powerconnectionai` → *All repositories* | Web sessions use it to push and open PRs. `@claude` in GitHub runs `.github/workflows/claude.yml` (needs the secret in §5) |
+| **Linear** | Linear → Settings → Integrations → GitHub → connect `powerconnectionai` | Links branches/PRs that carry the issue key (`POW-123`) and closes the issue on merge |
 | **One review bot** | CodeRabbit (app.coderabbit.ai) *or* Cursor Bugbot *or* Copilot code review (§4) | Pick **one**. Two bots doubled the noise on the old PR #1 |
-| OpenAI Codex (cloud) | chatgpt.com/codex → Settings → GitHub connector | Select `<ORG>` only |
-| Cursor (background agents) | cursor.com → Settings → Integrations → GitHub | Select `<ORG>` only |
+| OpenAI Codex (cloud) | chatgpt.com/codex → Settings → GitHub connector | Select `powerconnectionai` only |
+| Cursor (background agents) | cursor.com → Settings → Integrations → GitHub | Select `powerconnectionai` only |
 | Devin | app.devin.ai → Settings → Integrations → GitHub | Only the repos Devin works in |
 | Warp | Warp → Settings → AI → Rules | Reads `AGENTS.md`; API keys stay in 1Password (Linear POW-89) |
 | Vercel / Render / Cloudflare | each dashboard → Git integration | Only the repos that deploy there (`powerconnection`, `onewish`, …) |
@@ -63,9 +63,9 @@ these repos, but the org-level coding agent and policies below need the org plan
 ## 5. Secrets for workflows (from 1Password, never pasted in chat)
 ```bash
 claude setup-token                    # on the Mac: creates a long-lived Claude Code token; save it in 1Password as "Claude Code GitHub token"
-op read "op://AI-Agents/Claude Code GitHub token/credential" | gh secret set CLAUDE_CODE_OAUTH_TOKEN --org <ORG> --visibility all
+op read "op://AI-Agents/Claude Code GitHub token/credential" | gh secret set CLAUDE_CODE_OAUTH_TOKEN --org powerconnectionai --visibility all
 ```
-If GitHub refuses org-level secrets for private repos on your plan, set it per repo instead: `… | gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo <ORG>/<repo>`.
+If GitHub refuses org-level secrets for private repos on your plan, set it per repo instead: `… | gh secret set CLAUDE_CODE_OAUTH_TOKEN --repo powerconnectionai/<repo>`.
 Nothing else is needed for CI: the secret scan and tests use no secrets.
 
 ## 6. Your Mac: one identity everywhere
@@ -84,12 +84,12 @@ git config --global pull.rebase true
 git config --global core.excludesFile ~/.gitignore_global   # from the config repo
 
 # Fresh clones of the new repos (old clones stay where they are until you archive them)
-mkdir -p ~/Code/<ORG> && cd ~/Code/<ORG>
-for r in config platform powerconnection onewish litigationforce voice-agents lab; do gh repo clone "<ORG>/$r"; done
+mkdir -p ~/Code/powerconnectionai && cd ~/Code/powerconnectionai
+for r in config platform powerconnection onewish litigationforce voice-agents lab; do gh repo clone "powerconnectionai/$r"; done
 ```
 - ☐ One SSH key (`~/.ssh/id_ed25519`), stored in 1Password's SSH agent and added to GitHub. Delete stale keys at github.com/settings/keys.
-- ☐ Fine-grained PATs only (scoped to `<ORG>`, with an expiry), stored in 1Password. Revoke all classic PATs at github.com/settings/tokens.
-- ☐ Folder layout: `~/Code/<ORG>/<repo>` (see `docs/ARCHITECTURE.md`).
+- ☐ Fine-grained PATs only (scoped to `powerconnectionai`, with an expiry), stored in 1Password. Revoke all classic PATs at github.com/settings/tokens.
+- ☐ Folder layout: `~/Code/powerconnectionai/<repo>` (see `docs/ARCHITECTURE.md`).
 
 ## 7. Agent CLIs and IDEs: every tool reads the same rules
 | Tool | Setup | Rules come from |
@@ -112,7 +112,7 @@ of the full history + `make lint` + `make test`) · `.github/workflows/claude.ym
 `.github/workflows/copilot-setup-steps.yml` · `.github/dependabot.yml` · `CODEOWNERS` · PR template · issue form (Linear
 first, with a no-secrets/PII/privileged-material check) · `.claude/settings.json` · `.vscode/extensions.json` ·
 `.devcontainer/` · `.editorconfig` · `.gitignore` (secrets blocked) · `Makefile` (`setup`, `lint`, `test`, `dev`).
-When you create a repo from the template, change `CODEOWNERS` to `@<ORG>/maintainers`.
+When you create a repo from the template, change `CODEOWNERS` to `@powerconnectionai/maintainers`.
 
 ## 9. Which settings need a paid plan
 Prices are GitHub's list prices as last checked. Confirm on github.com/pricing before buying. Nothing here is bought automatically.

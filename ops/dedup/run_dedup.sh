@@ -10,6 +10,7 @@
 #   SKIP_CLOUDSTORAGE="GoogleDrive-me@x.com OneDrive-OneWishLabs" ...   # local sync folders whose account is already in
 #     CLOUD_REMOTES, so the same files aren't listed twice (start_here.sh asks). Only the named folders are skipped.
 #     pCloud Drive mounts are never walked.
+#   SKIP_ICLOUD=1 ...   # leave iCloud Drive out (e.g. when macOS's iCloud sync is slow and the scan stalls there)
 #
 # Surfaces: mac-local (Desktop, Documents, Downloads, ~/Code), each ~/Library/CloudStorage/* folder (Google Drive,
 # OneDrive, Dropbox, Box), and iCloud Drive (metadata only: cloud-only files are never downloaded or hashed).
@@ -42,7 +43,8 @@ for d in "$HOME"/Library/CloudStorage/*; do
 done
 [ -n "${SSD_ROOT:-}" ] && [ -d "$SSD_ROOT" ] && scan --surface ssd --root "$SSD_ROOT"
 ICLOUD="$HOME/Library/Mobile Documents/com~apple~CloudDocs"
-[ -d "$ICLOUD" ] && scan --surface icloud-drive --root "$ICLOUD"
+if [ "${SKIP_ICLOUD:-0}" = 1 ]; then echo "  skip iCloud Drive (SKIP_ICLOUD=1)" >> "$RUN/scan.log"
+elif [ -d "$ICLOUD" ]; then scan --surface icloud-drive --root "$ICLOUD"; fi
 
 fail=0
 for p in $pids; do wait "$p" || fail=1; done
