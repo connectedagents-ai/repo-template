@@ -17,3 +17,9 @@ Keep this file short. Repo-specific rules live in each repo's AGENTS.md.
 - No secrets in files. Use 1Password references (`op://…`) or env vars injected by `op run`.
 - Archive, never delete: move retired material to `~/Archive/<topic>-<YYYYMMDD>/`.
 - Ask before doing anything destructive or outward-facing: deleting, force-pushing, transferring repos, or sending messages.
+
+## Web, terminal and computer-control jobs
+- Before starting: show a pre-job checklist (goal, every URL/command/file, tools checked as installed and signed in,
+  steps that need me, how to undo) and wait for my OK. Install a missing tool only with my approval.
+- After finishing: give a confirmation list, each item done/failed/skipped with proof, plus what's left for me as full
+  URLs and copy-paste commands.

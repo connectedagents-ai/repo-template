@@ -21,7 +21,9 @@ You are working on my Mac with me watching. Rules for everything I ask today:
 - Never copy large data onto the Mac's internal disk. Backups and reports go on "/Volumes/Extreme SSD". If the SSD is not mounted, stop.
 - My code repo is ~/Code/repo-template. Read its AGENTS.md before running anything from it. Run `git pull` there first.
 - Use the gh CLI in Terminal for GitHub when you can; use Chrome for pages that need clicking.
-- After each task, give me a short report: what ran, what passed, what failed, what you skipped.
+- Before each task, show a pre-job checklist: goal, every page/command/file, the tools you need (check they are
+  installed and signed in: gh auth status, python3, node, the SSD), the steps that need me, and how to undo it. Wait for my OK.
+- After each task, give me a confirmation list: each checklist item done/failed/skipped with proof, and what's left for me.
 ```
 
 ## Task 1: back up Connected-Energy-AI to the SSD (10–30 min, read-only on GitHub)

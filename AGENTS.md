@@ -49,3 +49,14 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Report results honestly: what ran, what passed, what didn't, what you skipped.
 - For every step the owner does themselves, give the exact page as a full, visible URL (not only link text) and a
   copy-paste command or script. The owner is a beginner: no step should need them to find a setting or write code.
+
+## 6. Agent-run jobs: web, terminal, clicking, forms, configuration
+Every job an agent does for the owner in a browser, a terminal or by computer control follows three steps:
+1. **Pre-job checklist, shown before starting.** Goal and done-when · every page (full URL), command and file it will
+   touch · tools it needs, checked to be present and signed in (e.g. `gh auth status`, browser connected, `python3`,
+   `node`, the SSD mounted), installing what's missing only with a copy-paste command the owner approves · which steps
+   need the owner (logins, 2FA, payments, deletions) · how to undo it. Wait for the owner's OK.
+2. **Do the job**, pausing at each step that needs the owner.
+3. **Confirmation list after finishing.** Each checklist item marked done / failed / skipped, with proof (the command
+   output, the page state, a screenshot) · what changed and where · anything left for the owner, as full URLs and
+   copy-paste commands.
