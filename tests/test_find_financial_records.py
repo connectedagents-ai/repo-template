@@ -1,4 +1,4 @@
-import csv, os, zipfile
+import csv, os, subprocess, zipfile
 from tests.helpers import OPS, TempDirTest
 
 SCRIPT = OPS / "financial-discovery/find_financial_records.py"
@@ -81,3 +81,28 @@ class FindFinancialRecordsTest(TempDirTest):
         self.assertEqual(self.rows()["acme.txt"]["entities"], "Acme Holdings LLC")
         self.assertTrue((self.out / "collection/Acme Holdings LLC/banking/2024/2024_banking_acme.txt").is_file())
         self.assertTrue((self.out / "collection/_no-entity/banking/2023/2023_banking_statement.txt").is_file())
+
+    def test_move_duplicates_preview_then_apply_and_restore(self):
+        dup, keep = self.src / "bank/copy.txt", self.src / "bank/statement.txt"
+        r = self.run_script("--move-duplicates")
+        self.assertIn("Would move 1 duplicates", r.stdout)
+        self.assertTrue(dup.is_file())
+        self.run_script("--move-duplicates", "--apply")
+        moved = self.src / "_duplicates/bank/copy.txt"
+        self.assertTrue(moved.is_file())
+        self.assertFalse(dup.exists())
+        self.assertTrue(keep.is_file())
+        subprocess.run(["bash", str(self.out / "restore_duplicates.sh")], check=True)
+        self.assertTrue(dup.is_file())
+        self.assertFalse(moved.exists())
+
+    def test_cloud_duplicate_stays_inside_its_shared_drive(self):
+        drive = self.src / "Library/CloudStorage/GoogleDrive-me/Shared drives/Deals"
+        (drive / "a").mkdir(parents=True)
+        (drive / "b").mkdir()
+        (drive / "a/bank statement 2024.pdf").write_text("x")
+        (drive / "b/bank statement 2024 copy.pdf").write_text("x")
+        self.run_script("--move-duplicates", "--apply")
+        self.assertTrue((drive / "_duplicates/b/bank statement 2024 copy.pdf").is_file())
+        self.assertTrue((drive / "a/bank statement 2024.pdf").is_file())
+

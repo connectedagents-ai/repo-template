@@ -10,6 +10,9 @@ Output goes to "/Volumes/Extreme SSD/financial-discovery/<stamp>/" (never the Ma
 summary.md (counts by category and year). --apply COPIES each unique match to collection/<category>/<year>/ with a
 clean name "<year>_<category>_<original name>"; originals are never moved, renamed or deleted. Possibly privileged
 files (attorney, counsel, work product) go to collection/_privilege-review/ for a lawyer to look at first.
+--move-duplicates moves each exact duplicate (same sha256 as the kept file) into a "_duplicates" folder at the top of
+the same drive (the scanned folder, or that Google Drive / shared drive), keeping its folder path; with --apply it
+moves them for real and writes MOVED.tsv and restore_duplicates.sh, which puts every file back. Nothing is deleted.
 Matter-specific words (party names, account numbers) belong in a local --terms file on the SSD, never in this repo:
 one "category: regex" per line. --entities is a second local file, one "Entity name: regex" per line
 (legal name, DBAs, EIN); each match is tagged with its entities and, with --apply, filed under the first one. Google Drive, shared drives, OneDrive and iCloud: pass ~/Library/CloudStorage and "~/Library/Mobile Documents".
@@ -17,7 +20,7 @@ Files there are matched by file and folder name only, because reading them makes
 the Mac's internal disk; --read-cloud reads them anyway. Native Google Docs (.gdoc) are always name-only. Reads text from .txt/.csv/.md/.eml/.ofx/.qfx/.qbo/.json, .docx/.xlsx/.pptx, and .pdf
 when pdftotext is installed (brew install poppler); other files are matched by name and folder only.
 """
-import argparse, csv, hashlib, re, shutil, subprocess, sys, zipfile
+import argparse, csv, hashlib, os, re, shlex, shutil, subprocess, sys, zipfile
 from collections import Counter
 from datetime import datetime
 from pathlib import Path
@@ -50,7 +53,7 @@ CLOUD_IN_LIBRARY = {"CloudStorage", "Mobile Documents"}  # Google Drive / OneDri
 COPY_NAME = re.compile(r"(\bcopy\b|\s\d{1,2}$|\(\d+\)$)", re.I)
 YEAR = re.compile(r"(?<!\d)(20[0-4]\d)(?!\d)")
 SKIP_DIRS = {".git", "node_modules", ".Trash", ".cache", "__pycache__", ".venv", "venv",
-             ".Spotlight-V100", ".fseventsd", ".DocumentRevisions-V100", "financial-discovery"}
+             ".Spotlight-V100", ".fseventsd", ".DocumentRevisions-V100", "financial-discovery", "_duplicates"}
 TEXT_EXT = {".txt", ".csv", ".md", ".eml", ".ofx", ".qfx", ".qbo", ".json", ".tsv"}
 ZIP_EXT = {".docx", ".xlsx", ".pptx"}
 MAX_TEXT = 2_000_000
@@ -147,11 +150,56 @@ def mark_duplicates(rows):
                 r["duplicate_of"] = keep["path"]
 
 
+def duplicates_home(path, root):
+    """Top of the drive a duplicate stays on: its Google Drive, shared drive or cloud folder, else the scanned folder."""
+    parts = path.parts
+    if "CloudStorage" in parts:
+        i = parts.index("CloudStorage")
+        depth = 3 if parts[i + 2:i + 3] == ("My Drive",) else 4 if parts[i + 2:i + 3] == ("Shared drives",) else 2
+        return Path(*parts[:i + depth])
+    return root
+
+
+def move_duplicates(rows, out, apply):
+    """Move exact duplicates into <drive top>/_duplicates/<same path>; returns (planned, moved)."""
+    planned = moved = 0
+    log = restore = None
+    if apply:
+        log, restore = open(out / "MOVED.tsv", "a"), open(out / "restore_duplicates.sh", "a")
+        restore.write("#!/bin/bash\n# Put back the duplicates moved by find_financial_records.py\n")
+    for r in rows:
+        if not r["duplicate_of"]:
+            continue
+        src, keep = Path(r["path"]), Path(r["duplicate_of"])
+        home = duplicates_home(src, Path(r["scan_root"]))
+        dest = home / "_duplicates" / src.relative_to(home)
+        planned += 1
+        if not apply:
+            print(f"would move  {src}\n        to  {dest}\n      kept  {keep}")
+            continue
+        if not keep.is_file() or sha256(src) != r["sha256"] or sha256(keep) != r["sha256"]:
+            print(f"  left alone (changed since the scan or kept copy missing): {src}", file=sys.stderr)
+            continue
+        n = 1
+        while dest.exists():
+            dest = dest.with_name(f"{src.stem}_{n}{src.suffix}")
+            n += 1
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        os.rename(src, dest)
+        log.write(f"{r['sha256']}\t{src}\t{dest}\t{keep}\n")
+        restore.write(f"mkdir -p {shlex.quote(str(src.parent))} && mv -n {shlex.quote(str(dest))} {shlex.quote(str(src))}\n")
+        moved += 1
+    if apply:
+        log.close(); restore.close()
+        os.chmod(out / "restore_duplicates.sh", 0o755)
+    return planned, moved
+
+
 def walk(roots):
     for root in roots:
         root = Path(root).expanduser()
         if root.is_file():
-            yield root
+            yield root.parent, root
             continue
         for p in root.rglob("*"):
             rel = p.relative_to(root).parts
@@ -160,7 +208,7 @@ def walk(roots):
             if any(part in SKIP_DIRS or part.startswith(".") for part in rel):
                 continue
             if p.is_file() and not p.is_symlink():
-                yield p
+                yield root, p
 
 
 def main():
@@ -171,6 +219,8 @@ def main():
     ap.add_argument("--terms", help="local file of extra 'category: regex' lines (keep it on the SSD)")
     ap.add_argument("--entities", help="local file of 'Entity name: regex' lines (names, DBAs, EINs; keep it on the SSD)")
     ap.add_argument("--apply", action="store_true", help="copy unique matches into the collection folder")
+    ap.add_argument("--move-duplicates", action="store_true",
+                    help="move exact duplicates into a _duplicates folder on the same drive (preview unless --apply)")
     ap.add_argument("--read-cloud", action="store_true", help="also read the contents of cloud-synced files")
     ap.add_argument("--allow-internal", action="store_true", help="allow --out outside /Volumes (not recommended)")
     a = ap.parse_args()
@@ -184,7 +234,7 @@ def main():
     rules, priv, ents = load_terms(a.terms), re.compile(PRIVILEGE, re.I), load_entities(a.entities)
 
     rows, scanned = [], 0
-    for p in walk(a.roots):
+    for root, p in walk(a.roots):
         scanned += 1
         cloud = "/Library/CloudStorage/" in str(p) or "/Library/Mobile Documents/" in str(p)
         text = "" if cloud and not a.read_cloud else file_text(p)
@@ -199,7 +249,7 @@ def main():
                      "years": ";".join(map(str, years)), "year_basis": basis, "matched_terms": "; ".join(terms),
                      "privilege_review": "yes" if priv.search(f"{p.name}\n{text}") else "",
                      "text_read": "yes" if text else "name-only", "size": p.stat().st_size, "sha256": sha256(p),
-                     "duplicate_of": ""})
+                     "duplicate_of": "", "scan_root": str(root)})
         if scanned % 500 == 0:
             print(f"  …{scanned} files scanned, {len(rows)} matches", file=sys.stderr)
 
@@ -229,6 +279,10 @@ def main():
                 log.write(f"{r['sha256']}\t{src}\t{dest}\n")
                 copied += 1
 
+    planned = moved = 0
+    if a.move_duplicates:
+        planned, moved = move_duplicates(rows, out, a.apply)
+
     unique = [r for r in rows if not r["duplicate_of"]]
     table = Counter((r["category"], r["years"].split(";")[-1]) for r in unique)
     lines = [f"# Financial records since {a.since}", "",
@@ -243,6 +297,10 @@ def main():
     print(f"\nReport: {out}/index.csv and summary.md")
     print(f"Copied {copied} files into {out}/collection (originals untouched)." if a.apply
           else "Preview only: nothing was copied. Re-run with --apply to build the collection.")
+    if a.move_duplicates:
+        print(f"Moved {moved} of {planned} duplicates into _duplicates folders. Undo: bash "
+              f"{shlex.quote(str(out / 'restore_duplicates.sh'))}" if a.apply
+              else f"Would move {planned} duplicates into _duplicates folders (preview; add --apply to move).")
 
 
 if __name__ == "__main__":
