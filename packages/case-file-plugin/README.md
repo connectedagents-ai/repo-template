@@ -1,6 +1,7 @@
 # case-file plugin (Claude Code and Claude Cowork)
 
-Two skills: `case-file-organizer` (find, de-duplicate and file a lawsuit's records on the SSD) and
+Three skills: `case-file-organizer` (find, de-duplicate and file a lawsuit's records on the SSD),
+`agreement-relationship-review` (agreements, obligations, breaches, exclusivity, reliance, contract damages) and
 `case-file-deliverables` (chronology, people map, claim-to-evidence matrix, deposition outlines, jury timeline,
 litigation-finance brief). The plugin holds instructions only; case data lives on the owner's SSD.
 
