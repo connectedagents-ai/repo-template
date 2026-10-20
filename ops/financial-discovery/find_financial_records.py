@@ -14,7 +14,9 @@ files (attorney, counsel, work product) go to collection/_privilege-review/ for 
 the same drive (the scanned folder, or that Google Drive / shared drive), keeping its folder path; with --apply it
 moves them for real and writes MOVED.tsv and restore_duplicates.sh, which puts every file back. Nothing is deleted.
 Matter-specific words (party names, account numbers) belong in a local --terms file on the SSD, never in this repo:
-one "category: regex" per line. --entities is a second local file, one "Entity name: regex" per line
+one "category: regex" per line. --categories replaces the built-in financial categories with your own file (see
+litigation_categories.txt for a case file: pleadings, agreements, correspondence, transcripts, damages, deposition and
+trial material, litigation finance); --layout type files the collection by category/year. --entities is a second local file, one "Entity name: regex" per line
 (legal name, DBAs, EIN); each match is tagged with its entities and, with --apply, filed under the first one. Google Drive, shared drives, OneDrive and iCloud: pass ~/Library/CloudStorage and "~/Library/Mobile Documents".
 Files there are matched by file and folder name only, because reading them makes the cloud app download them onto
 the Mac's internal disk; --read-cloud reads them anyway. Native Google Docs (.gdoc) are always name-only. Reads text from .txt/.csv/.md/.eml/.ofx/.qfx/.qbo/.json, .docx/.xlsx/.pptx, and .pdf
@@ -79,8 +81,20 @@ def file_text(path):
     return ""
 
 
-def load_terms(path):
-    rules = {k: [re.compile(v, re.I)] for k, v in CATEGORIES.items()}
+def load_categories(path):
+    """Built-in financial categories, or a 'category: regex' file that replaces them (e.g. litigation_categories.txt)."""
+    if not path:
+        return dict(CATEGORIES)
+    cats = {}
+    for line in Path(path).read_text().splitlines():
+        if ":" in line and not line.lstrip().startswith("#"):
+            cat, rx = line.split(":", 1)
+            cats[cat.strip()] = f"{cats[cat.strip()]}|{rx.strip()}" if cat.strip() in cats else rx.strip()
+    return cats
+
+
+def load_terms(path, categories=CATEGORIES):
+    rules = {k: [re.compile(v, re.I)] for k, v in categories.items()}
     if path:
         for line in Path(path).read_text().splitlines():
             if ":" in line and not line.lstrip().startswith("#"):
@@ -217,6 +231,9 @@ def main():
     ap.add_argument("--since", type=int, default=2022, help="first year to include (default 2022)")
     ap.add_argument("--out", type=Path, help="report folder (default: on the Extreme SSD)")
     ap.add_argument("--terms", help="local file of extra 'category: regex' lines (keep it on the SSD)")
+    ap.add_argument("--categories", help="file of 'category: regex' lines that replaces the built-in financial ones")
+    ap.add_argument("--layout", choices=["entity", "type"], default="entity",
+                    help="collection folders: entity/category/year (default) or category/year with the entity in the index")
     ap.add_argument("--entities", help="local file of 'Entity name: regex' lines (names, DBAs, EINs; keep it on the SSD)")
     ap.add_argument("--apply", action="store_true", help="copy unique matches into the collection folder")
     ap.add_argument("--move-duplicates", action="store_true",
@@ -231,7 +248,8 @@ def main():
     if not a.out and not Path("/Volumes/Extreme SSD").is_dir():
         sys.exit("The Extreme SSD is not mounted. Plug it in, or pass --out /Volumes/<drive>/financial-discovery.")
     out.mkdir(parents=True, exist_ok=True)
-    rules, priv, ents = load_terms(a.terms), re.compile(PRIVILEGE, re.I), load_entities(a.entities)
+    rules, priv = load_terms(a.terms, load_categories(a.categories)), re.compile(PRIVILEGE, re.I)
+    ents = load_entities(a.entities)
 
     rows, scanned = [], 0
     for root, p in walk(a.roots):
@@ -267,7 +285,8 @@ def main():
                 if r["duplicate_of"]:
                     continue
                 src, year = Path(r["path"]), r["years"].split(";")[-1]
-                owner = safe(r["entities"].split(";")[0]) + "/" if r["entities"] else ("_no-entity/" if ents else "")
+                owner = "" if a.layout == "type" or not ents else (
+                    safe(r["entities"].split(";")[0]) + "/" if r["entities"] else "_no-entity/")
                 folder = "_privilege-review" if r["privilege_review"] else f"{owner}{r['category']}/{year}"
                 dest = out / "collection" / folder / f"{year}_{r['category']}_{src.name}"
                 n = 1
@@ -285,7 +304,7 @@ def main():
 
     unique = [r for r in rows if not r["duplicate_of"]]
     table = Counter((r["category"], r["years"].split(";")[-1]) for r in unique)
-    lines = [f"# Financial records since {a.since}", "",
+    lines = [f"# Records since {a.since}", "",
              f"Scanned {scanned} files; {len(rows)} matches, {len(unique)} unique "
              f"({sum(1 for r in unique if r['privilege_review'])} flagged for privilege review, "
              f"{sum(1 for r in unique if r['year_basis'] == 'modified-date')} dated only by file date).", "",

@@ -106,3 +106,17 @@ class FindFinancialRecordsTest(TempDirTest):
         self.assertTrue((drive / "_duplicates/b/bank statement 2024 copy.pdf").is_file())
         self.assertTrue((drive / "a/bank statement 2024.pdf").is_file())
 
+    def test_litigation_categories_and_type_layout(self):
+        cats = OPS / "financial-discovery/litigation_categories.txt"
+        ents = self.tmp / "entities.txt"
+        ents.write_text("Acme Corp: acme\n")
+        (self.src / "Acme MNDA signed 2022.pdf").write_text("x")
+        (self.src / "deposition outline acme 2024.docx").write_text("outline")
+        self.run_script("--categories", cats, "--entities", ents, "--layout", "type", "--since", "2021", "--apply")
+        rows = self.rows()
+        self.assertEqual(rows["Acme MNDA signed 2022.pdf"]["category"], "02-agreements")
+        self.assertEqual(rows["Acme MNDA signed 2022.pdf"]["entities"], "Acme Corp")
+        col = self.out / "collection"
+        self.assertTrue((col / "02-agreements/2022/2022_02-agreements_Acme MNDA signed 2022.pdf").is_file())
+        self.assertTrue((col / "10-deposition-prep/2024").is_dir())
+
