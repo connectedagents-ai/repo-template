@@ -11,7 +11,8 @@ summary.md (counts by category and year). --apply COPIES each unique match to co
 clean name "<year>_<category>_<original name>"; originals are never moved, renamed or deleted. Possibly privileged
 files (attorney, counsel, work product) go to collection/_privilege-review/ for a lawyer to look at first.
 Matter-specific words (party names, account numbers) belong in a local --terms file on the SSD, never in this repo:
-one "category: regex" per line. Google Drive, shared drives, OneDrive and iCloud: pass ~/Library/CloudStorage and "~/Library/Mobile Documents".
+one "category: regex" per line. --entities is a second local file, one "Entity name: regex" per line
+(legal name, DBAs, EIN); each match is tagged with its entities and, with --apply, filed under the first one. Google Drive, shared drives, OneDrive and iCloud: pass ~/Library/CloudStorage and "~/Library/Mobile Documents".
 Files there are matched by file and folder name only, because reading them makes the cloud app download them onto
 the Mac's internal disk; --read-cloud reads them anyway. Native Google Docs (.gdoc) are always name-only. Reads text from .txt/.csv/.md/.eml/.ofx/.qfx/.qbo/.json, .docx/.xlsx/.pptx, and .pdf
 when pdftotext is installed (brew install poppler); other files are matched by name and folder only.
@@ -27,10 +28,12 @@ CATEGORIES = {
     "income-tax": r"\b1040\b|\bw-?2\b|\b1099(-?[a-z]{1,3})?\b|tax\s*return|\birs\b|tax\s*transcript|schedule\s*[ce]\b"
                   r"|\b1065\b|\b1120-?s?\b|form\s*\d{3,4}|estimated\s*tax|franchise\s*tax|turbotax|tax\s*year",
     "investments": r"brokerage|portfolio|\b401\s*\(?k\)?|\bira\b|roth|securities|dividend|capital\s*gain|schwab|fidelity"
-                   r"|vanguard|e\*?trade|robinhood|merrill|morgan\s*stanley|coinbase|crypto|bitcoin|annuity|trade\s*confirm",
+                   r"|vanguard|e\*?trade|robinhood|merrill|morgan\s*stanley|coinbase|crypto|bitcoin|annuity|trade\s*confirm"
+                   r"|qualified\s*opportunity|\bqof\b|\bqozb?\b|form\s*899[67]",
     "lp-business-interests": r"limited\s*partnership|\bl\.?p\.?\b|\bk-?1\b|partnership\s*agreement|operating\s*agreement"
                              r"|membership\s*interest|capital\s*account|capital\s*call|subscription\s*agreement"
-                             r"|cap\s*table|\bllc\b|distribution\s*notice|units?\s*held|shareholder",
+                             r"|cap\s*table|\bllc\b|distribution\s*notice|units?\s*held|shareholder"
+                             r"|certificate\s*of\s*formation|public\s*information\s*report|\bcp\s*575\b|ein\s*letter",
     "loans-debt": r"\bloan\b|mortgage|promissory\s*note|line\s*of\s*credit|\bheloc\b|credit\s*card\s*statement|\blien\b",
     "financial-statements": r"balance\s*sheet|profit\s*(and|&)\s*loss|\bp\s*&\s*l\b|income\s*statement|general\s*ledger"
                             r"|quickbooks|cash\s*flow|financial\s*statement|audit(ed)?\s*report|trial\s*balance",
@@ -81,6 +84,26 @@ def load_terms(path):
                 cat, rx = line.split(":", 1)
                 rules.setdefault(cat.strip(), []).append(re.compile(rx.strip(), re.I))
     return rules
+
+
+def load_entities(path):
+    ents = {}
+    for line in (Path(path).read_text().splitlines() if path else []):
+        if ":" in line and not line.lstrip().startswith("#"):
+            name, rx = line.split(":", 1)
+            ents.setdefault(name.strip(), []).append(re.compile(rx.strip(), re.I))
+    return ents
+
+
+def entities_of(path, text, ents):
+    """Entity names whose patterns appear, most mentions first."""
+    hay = f"{path}\n{text}"
+    hits = Counter({name: sum(len(rx.findall(hay)) for rx in rxs) for name, rxs in ents.items()})
+    return [n for n, c in hits.most_common() if c]
+
+
+def safe(name):
+    return re.sub(r"[^\w .,&-]+", "", name).strip() or "unnamed"
 
 
 def classify(path, text, rules):
@@ -146,6 +169,7 @@ def main():
     ap.add_argument("--since", type=int, default=2022, help="first year to include (default 2022)")
     ap.add_argument("--out", type=Path, help="report folder (default: on the Extreme SSD)")
     ap.add_argument("--terms", help="local file of extra 'category: regex' lines (keep it on the SSD)")
+    ap.add_argument("--entities", help="local file of 'Entity name: regex' lines (names, DBAs, EINs; keep it on the SSD)")
     ap.add_argument("--apply", action="store_true", help="copy unique matches into the collection folder")
     ap.add_argument("--read-cloud", action="store_true", help="also read the contents of cloud-synced files")
     ap.add_argument("--allow-internal", action="store_true", help="allow --out outside /Volumes (not recommended)")
@@ -157,7 +181,7 @@ def main():
     if not a.out and not Path("/Volumes/Extreme SSD").is_dir():
         sys.exit("The Extreme SSD is not mounted. Plug it in, or pass --out /Volumes/<drive>/financial-discovery.")
     out.mkdir(parents=True, exist_ok=True)
-    rules, priv = load_terms(a.terms), re.compile(PRIVILEGE, re.I)
+    rules, priv, ents = load_terms(a.terms), re.compile(PRIVILEGE, re.I), load_entities(a.entities)
 
     rows, scanned = [], 0
     for p in walk(a.roots):
@@ -170,7 +194,8 @@ def main():
         years, basis = years_of(p, text, a.since)
         if max(years) < a.since:
             continue
-        rows.append({"path": str(p), "category": cats[0], "all_categories": ";".join(cats),
+        rows.append({"path": str(p), "entities": ";".join(entities_of(p, text, ents)),
+                     "category": cats[0], "all_categories": ";".join(cats),
                      "years": ";".join(map(str, years)), "year_basis": basis, "matched_terms": "; ".join(terms),
                      "privilege_review": "yes" if priv.search(f"{p.name}\n{text}") else "",
                      "text_read": "yes" if text else "name-only", "size": p.stat().st_size, "sha256": sha256(p),
@@ -192,7 +217,8 @@ def main():
                 if r["duplicate_of"]:
                     continue
                 src, year = Path(r["path"]), r["years"].split(";")[-1]
-                folder = "_privilege-review" if r["privilege_review"] else f"{r['category']}/{year}"
+                owner = safe(r["entities"].split(";")[0]) + "/" if r["entities"] else ("_no-entity/" if ents else "")
+                folder = "_privilege-review" if r["privilege_review"] else f"{owner}{r['category']}/{year}"
                 dest = out / "collection" / folder / f"{year}_{r['category']}_{src.name}"
                 n = 1
                 while dest.exists():

@@ -164,7 +164,7 @@ Read ops/financial-discovery/find_financial_records.py (top comment). Check the 
 terms file "/Volumes/Extreme SSD/financial-discovery/terms.txt" exists. Then run the preview across the Mac, the SSD,
 Google Drive (incl. shared drives) and iCloud:
 python3 ~/Code/repo-template/ops/financial-discovery/find_financial_records.py --since 2022 \
-  --terms "/Volumes/Extreme SSD/financial-discovery/terms.txt" \
+  --terms "/Volumes/Extreme SSD/financial-discovery/terms.txt" --entities "/Volumes/Extreme SSD/financial-discovery/entities.txt" \
   ~/Documents ~/Desktop ~/Downloads ~/Library/CloudStorage "$HOME/Library/Mobile Documents" "/Volumes/Extreme SSD"
 Show me summary.md and the 20 largest categories by count. Wait for my OK, then re-run the same command with --apply.
 Never move, rename or delete originals. Tell me where the collection and COPIED.tsv are.

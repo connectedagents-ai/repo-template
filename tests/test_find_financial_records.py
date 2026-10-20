@@ -72,3 +72,12 @@ class FindFinancialRecordsTest(TempDirTest):
         terms.write_text("banking: soup\n")
         self.run_script("--terms", terms)
         self.assertEqual(self.rows()["recipe.txt"]["category"], "banking")
+
+    def test_entities_file_tags_and_files_by_company(self):
+        ents = self.tmp / "entities.txt"
+        ents.write_text("Acme Holdings LLC: acme\s*holdings|12-?3456789\nBeta Fund LP: beta\s*fund\n")
+        (self.src / "bank/acme.txt").write_text("Chase checking statement 2024 EIN 12-3456789")
+        self.run_script("--entities", ents, "--apply")
+        self.assertEqual(self.rows()["acme.txt"]["entities"], "Acme Holdings LLC")
+        self.assertTrue((self.out / "collection/Acme Holdings LLC/banking/2024/2024_banking_acme.txt").is_file())
+        self.assertTrue((self.out / "collection/_no-entity/banking/2023/2023_banking_statement.txt").is_file())
