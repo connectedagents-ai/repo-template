@@ -185,6 +185,8 @@ GitHub topics, Drive labels, SharePoint columns, Finder tags, Notion database pr
    | **Plugin** | maintained upstream (Anthropic, vendor plugins) | leave installed via the plugin marketplace; do not copy |
    | **Retire** | duplicate, superseded, unused 90 days, or just restates `AGENTS.md` | archive; note `supersedes:` in the survivor |
 
+   Skills saved as `.docx`, PDF or web clippings (`SKILL.md.docx`) are invisible to every agent: convert each back to a plain
+   `SKILL.md` or archive it. A skill written for one upstream project (e.g. a repo's own file-I/O conventions) is **Domain**: it stays in that repo.
 3. **Merge variants** into one copy each: front matter `name` (verb-first kebab-case, equal to the folder name) and `description`
    (what it does and when to use it); `source:` and `supersedes:` lines for provenance. No secrets, client data or privileged text.
 4. **Starting core set** (check against the inventory; keep it under ~25): `client-discovery` (exists in `ops/client-discovery/skill/`),
@@ -249,7 +251,10 @@ Product repos get all of this from the template ([`GITHUB-SETUP.md`](GITHUB-SETU
      curl -sf "$XAI_BASE_URL/models" -H "Authorization: Bearer $XAI_API_KEY" | head -c 300; echo'
    ```
 4. Set a **monthly spend limit and alert** in each console (Anthropic Console, OpenAI platform, xAI console). Delete keys nobody owns.
-5. Claude Code headless (`claude -p`), the Claude Agent SDK, the OpenAI Agents SDK and Grok's OpenAI-compatible endpoint all read these
+5. **Google Cloud CLI** on the Mac: install with Google's installer or Homebrew (`brew search gcloud` for the current cask name), then
+   `gcloud init`, `gcloud auth application-default login` for SDKs, and a budget alert per project (`gcloud billing budgets create`).
+   Service-account keys are replaced by GitHub OIDC (workload identity federation) for CI.
+6. Claude Code headless (`claude -p`), the Claude Agent SDK, the OpenAI Agents SDK and Grok's OpenAI-compatible endpoint all read these
    same three variables.
 
 ### Phase 9 · Work hub, docs and deploy targets
@@ -313,6 +318,34 @@ Split the work into waves; agents in a wave run in parallel, and no wave starts 
 | 2 · Documents | `doc-scan` (Mac): `dedup_scan.py --root <folder> --ext … --skip-repos` → `dedup_merge.py` · `doc-dedup` (Mac): `dedup_apply.py` · `drive-consolidate` (Mac): `consolidate_to_drive.py` · `matter-memory`: matter brief into the private store + a Claude Project instruction | you approve PLAN.md; `rclone check` shows 0 missing |
 | 3 · Workspace | `inventory`, `code-push`, `export-<tool>` ×1 per account, `skills`, `tool-config` + `mcp`, `ontology`, `api-env` + `deploy`: phases 1–9 above | each phase's "Done when" |
 | 4 · GitHub declutter | `org-classify` (cloud): `migrate_to_connectedagents.sh <old-org>` dry run → classification sheet + what costs money · `org-migrate`: transfer, fold with `merge_into_monorepo.sh`, archive the rest · `org-declutter`: same inside the main org, close stale agent branches/PRs · **you**: remove the old org's seats and Copilot, downgrade or cancel it | old org has 0 active repos; its next invoice is $0 |
+
+## 6. How this fits the Chairman Agent and the Personal OS
+Three layers, one system. The Chairman Agent instructions (v0.1, on branch `claude/code-chairman-repo-org-ocoe3d` under `chairman/`)
+are the governance; this file and `ops/` are the execution; the Personal OS is the principal-facing layer on top.
+
+| Layer | Holds | Lives in |
+|---|---|---|
+| **Personal OS** (chief-of-staff agent) | Identity, operating principles, life areas, priority tiers 1–5, daily/weekly/decision modes | Personal content: a private Claude Project instruction + private Drive file only. Structure: skills `ops/skills/library/{morning-brief,weekly-review,decision-check}` |
+| **Chairman** (orchestrator) | Authority matrix, approval tickets, sub-agent roster, cadence, escalation | `config/agents/chairman-agent.md` (private repo). Its §11 decisions file and §2 of this file's account register are **one file** |
+| **Execution** (this file) | Waves, phases, scripts, tests | `ops/` here, then `config/ops/` |
+
+| Chairman agent | Runs | Wave / phase |
+|---|---|---|
+| INV-MAC | `audit_claude_files.sh`, `dedup_scan.py`, `skills_hub.py inventory` | 3 · phase 1 |
+| INV-REPO | `migrate_to_connectedagents.sh` dry run, `git-repos.txt` | 3–4 · phases 1–2 |
+| INV-DRIVE | `cloud_inventory.py` (Drive, OneDrive, SharePoint, pCloud) | 2–3 |
+| INV-CLOUD | `inventory_cloud.sh` | 3 · phase 1 |
+| INV-LLM / INV-CONN | account register §2, `run_discovery.sh` | 3 · phase 1 |
+| EXT-LLM-MEMORY, EXT-NOTES | `ingest_library.py --source <tool> --account <label>` | 3 · phase 3 |
+| REC-DEDUP-DOCS | `dedup_merge.py` → PLAN.md | 2 |
+| REC-ONTOLOGY | `lint_names.py` against `global-ontology.yaml` | 3 · phase 4 |
+| DIST-ARCHIVE | `dedup_apply.py`, `cloud_apply.py`, `consolidate_to_drive.py` (approval per batch) | 2 |
+| GOV-AUDIT | every script's MANIFEST.tsv + restore.sh = the receipt | all |
+| GOV-RISK | scanner + `find_plaintext_keys.py`; Phase −1 | 0–1 |
+| GOV-BRIEF | skill `morning-brief` (adds what ran, what needs approval) | daily |
+
+Supabase stays the system of record for **data registers** (entities, memory pack) as the Chairman doc says; git stays the home of
+**rules, skills, ontology and code**. The task sources are Todoist (personal and business) and Linear (dev work); add Todoist to the account register.
 
 ## Sources (checked 2026-10-22)
 - OpenAI Codex: [Agent Skills](https://developers.openai.com/codex/skills) (skills folder; `~/.agents/skills` per community guides such as [this one](https://codex.danielvaughan.com/2026/05/05/agent-skills-open-standard-portable-skills-codex-cli-cross-agent/))
