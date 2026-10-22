@@ -22,12 +22,22 @@ re-asked.
 |---|---|---|
 | MUL | Mullins v. Connected Solar, 2024-CI-17193 | POST-JUDGMENT (compelled production) |
 | WIN | Winchell | ON-APPEAL |
+| LEE | Lee v. Connected Solar & Bailey, 23-DCV-301569 (defense counsel withdrew Apr 2026) | FILED-ACTIVE (verify posture) |
 | TSL | Tesla program umbrella (Tesla, Vikta, Solytx, related parties) | POTENTIAL-NOT-FILED; RICO PARKED |
 | CUS | Customer disputes | per matter |
 | IRS | IRS collection / OIC | ACTIVE (administrative) |
 | EVC | Evictions and other | per matter |
 Matters sit under one program when they share facts (TSL umbrella). A document shared by several matters is stored
 once in its home matter, with Drive shortcuts in the others.
+
+### Tesla program forum architecture (from PARALLEL_LITIGATION_FRAMEWORK, 2026-06-11)
+Forums are assigned by contract. Nothing has been filed.
+| Track | Who | Forum |
+|---|---|---|
+| TSL-A | Tesla, Inc. | California, JAMS arbitration (per MNDA) |
+| TSL-B | Licensees, employees, executive consultants | Harris County, AAA arbitration |
+| TSL-C | All other defendants and claims | Texas court, jurisdiction to be decided |
+Every claim must stand on its own without RICO, using contract, tort, Texas statutory or federal non-RICO law.
 
 ## 3. Folder template (identical in every matter)
 ```
@@ -70,6 +80,18 @@ Its `06_Discovery_Production` holds a shortcut to it, never a copy or a move.
   - below 0.80: internal only, flagged
 - **Evidence labels:** VERIFIED · STATEMENT · OWNER-STATED · DISPUTED · AI-GENERATED (non-source).
 - **Production scope:** RESPONSIVE · OUT-OF-SCOPE (with a written reason) · ATTORNEY-REVIEW → privilege log.
+
+## 4b. Foundation datasets and formats (owner's existing systems; reuse, do not recreate)
+| Asset | Use |
+|---|---|
+| `canonical-dataset.yaml` + `schema.yaml` (org-chart-system) | entities, people, roles, service lines, locations, relationships, sources, confidence protocol |
+| `personnel-master-registry.yaml` (71 records) | party and witness IDs across internal team, contractors, defendants, counterparties, customers |
+| `master-timeline.json` + `combined-timelines-config.yaml` | event fields: event_id, date, date_precision, category, actors, evidence_ids, track, rico_relevance, claim_ids, entry_id. Views are filtered from the master by claim and by party, never edited separately. |
+| `litigation-operations` SKILL | artifact templates: Deep Dive Profile, Dossier, Evidence Wave, Timeline, RICO Graph Update (PARKED), Court Filing Tracker, Offensive Claim Prep |
+| `PARALLEL_LITIGATION_FRAMEWORK.md` | track routing and non-RICO cause-of-action matrix |
+| Financial Audit & Tax subsystem | IRS, OIC, reconciliation and damages agents |
+These files are privileged work product and contain personal data. They live in Drive (LEGAL MATTERS/00_Framework),
+never in this repo.
 
 ## 5. Naming
 `<KEY>_<YYYY-MM-DD>_<doctype>_<short-descriptor>`, for example `MUL_2026-08-31_order_compel-production`.
