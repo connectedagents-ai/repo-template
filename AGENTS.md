@@ -58,6 +58,7 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
   Every output goes to Drive `00_MASTER_INTAKE/_AGENT_OUTPUTS/<tool>/` with a handoff header, and every new or
   superseded artifact gets a row in the project registry
   (https://docs.google.com/spreadsheets/d/1WI8seKlAwl3DWGoMC83eWvdm15YYlwfMIdjg6vFx-pQ/edit). Update in place; never duplicate.
+- Follow `docs/OPERATING_PLAN.md` (durable stores, session start/end steps). The cloud container is never the only copy.
 - Never re-ask the owner a settled fact. Before any question, search the owner's established-facts register
   (Drive "00 ESTABLISHED FACTS"), prior handoffs and the project's source-of-truth files; ask only what none of
   them answers, and record every new answer in the register the same day.
