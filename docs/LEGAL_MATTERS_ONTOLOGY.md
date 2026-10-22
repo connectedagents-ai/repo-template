@@ -1,5 +1,10 @@
 # LEGAL MATTERS: folder structure and ontology
 
+> **Owner's rule (2026-10-22):** all LitigationForce material the owner shared is reference only. It guides the
+> ontology, the folder structure, regex rules and file review, and is used for **nothing else whatsoever**. It is never a
+> source of facts about any matter, never the basis for a case document, filing, production or IRS submission, and never
+> a reason to build or run the LitigationForce platform.
+
 Built on the owner's CURSOR-CLOUD-AGENTS / LitigationForce foundation:
 - `cases/{Case}/` workspaces
 - claim typing and the four-gate evaluator

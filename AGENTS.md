@@ -61,6 +61,8 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
   superseded artifact gets a row in the project registry
   (https://docs.google.com/spreadsheets/d/1WI8seKlAwl3DWGoMC83eWvdm15YYlwfMIdjg6vFx-pQ/edit). Update in place; never duplicate.
 - Follow `docs/OPERATING_PLAN.md` (durable stores, session start/end steps). The cloud container is never the only copy.
+- **LitigationForce material is reference only** (owner, 2026-10-22). Use it only to guide the ontology, folder structure,
+  regex and file review. Nothing else: never as case facts, never in filings or productions, never to build or run the platform.
 - Never re-ask the owner a settled fact. Before any question, search the owner's established-facts register
   (Drive "00 ESTABLISHED FACTS"), prior handoffs and the project's source-of-truth files; ask only what none of
   them answers, and record every new answer in the register the same day.
