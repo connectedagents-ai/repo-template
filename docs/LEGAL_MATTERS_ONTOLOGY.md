@@ -93,6 +93,16 @@ Its `06_Discovery_Production` holds a shortcut to it, never a copy or a move.
 These files are privileged work product and contain personal data. They live in Drive (LEGAL MATTERS/00_Framework),
 never in this repo.
 
+## 4c. Record cards (front-matter templates in `docs/templates/`)
+Every record is a Markdown note with YAML front matter, so it can be read by agents, Obsidian/Notion imports and scripts:
+- `matter.md`: one per matter. It is the `00_Matter_Card` of each matter folder.
+- `project.md`: one per project, `PRJ-<DOMAIN>-<SLUG>`.
+- `source-system.md`: one per system (Drive, Gmail, OneDrive, Notion, QuickBooks, IRS account, GitHub, AI tools),
+  with connector route, permissions and risks, and sync rules.
+- `financial-audit-tax-case.md`: one per tax/IRS case, `FIN-TAX-NNN`, under project `PRJ-FIN-INCOMETAX-ROBERTBAILEY`,
+  with gates GATE-FINANCIAL-WRITE and GATE-PRIVILEGE-REVIEW.
+Cards hold metadata and links only. Evidence stays in the matter folders.
+
 ## 5. Naming
 `<KEY>_<YYYY-MM-DD>_<doctype>_<short-descriptor>`, for example `MUL_2026-08-31_order_compel-production`.
 No "-v2", "-final" or "copy" suffixes; use the version history. Never use "do not say" style labels.
