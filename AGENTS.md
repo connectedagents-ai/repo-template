@@ -60,6 +60,7 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
   Every output goes to Drive `00_MASTER_INTAKE/_AGENT_OUTPUTS/<tool>/` with a handoff header, and every new or
   superseded artifact gets a row in the project registry
   (https://docs.google.com/spreadsheets/d/1WI8seKlAwl3DWGoMC83eWvdm15YYlwfMIdjg6vFx-pQ/edit). Update in place; never duplicate.
+- Segment and capture every work product and confirmation per `docs/WORK_PRODUCT_AND_CONFIRMATIONS.md` (Ledger tab of the master plan sheet).
 - Follow `docs/OPERATING_PLAN.md` (durable stores, session start/end steps). The cloud container is never the only copy.
 - **LitigationForce material is reference only** (owner, 2026-10-22). Use it only to guide the ontology, folder structure,
   regex and file review. Nothing else: never as case facts, never in filings or productions, never to build or run the platform.
