@@ -64,6 +64,9 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Follow `docs/OPERATING_PLAN.md` (durable stores, session start/end steps). The cloud container is never the only copy.
 - **LitigationForce material is reference only** (owner, 2026-10-22). Use it only to guide the ontology, folder structure,
   regex and file review. Nothing else: never as case facts, never in filings or productions, never to build or run the platform.
+- **No "questions for counsel"** (owner, 2026-10-22). An unresolved item means the research isn't finished. Label it
+  "research incomplete: <what is missing>", keep researching, then give the owner the facts and options so he can decide.
+  An item goes to a lawyer only after the owner says he doesn't have an answer.
 - Never re-ask the owner a settled fact. Before any question, search the owner's established-facts register
   (Drive "00 ESTABLISHED FACTS"), prior handoffs and the project's source-of-truth files; ask only what none of
   them answers, and record every new answer in the register the same day.
