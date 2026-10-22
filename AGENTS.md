@@ -17,6 +17,10 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Before creating a file, look for an existing one that already does the job. **Never** create copies such as `-v2`, `-final`, `-new`, `copy`,
   or date-stamped duplicates. Use git history and branches instead.
 - Experiments go on a branch or in `connectedagents-ai/agent-lab`, not in a new repo.
+- **File intake (until the owner says otherwise):** every new, loose or unsorted file goes to Google Drive >
+  My Drive > `00_MASTER_INTAKE` (https://drive.google.com/drive/folders/1gSKjscg0lJGdOVuhPbCXrRC-EUQiJQhd),
+  never the Mac Desktop or Downloads. Files leave intake only through the shared regex rules into the Global
+  Ontology domains, in logged batches the owner approves. Secrets never go to intake; they go to 1Password.
 
 ## 2. Workflow
 - Branch per task: `<type>/<short-slug>` (`feat/`, `fix/`, `chore/`, `docs/`). Agents may use their tool prefix (`claude/`, `codex/`, `cursor/`, `devin/`).
