@@ -51,6 +51,10 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Ask before anything destructive or outward-facing: deleting data, transferring or archiving repos, force-pushing, sending messages, spending money.
 - Don't widen scope. If you notice something unrelated, mention it in the PR instead of fixing it silently.
 - Report results honestly: what ran, what passed, what didn't, what you skipped.
+- Owner operating rules for all agents and LLMs: https://docs.google.com/document/d/1OoyYTeCVJB2V3QQW0CuP-9Kxf1w3qnY48MsIpQBR3eM/edit
+  Every output goes to Drive `00_MASTER_INTAKE/_AGENT_OUTPUTS/<tool>/` with a handoff header, and every new or
+  superseded artifact gets a row in the project registry
+  (https://docs.google.com/spreadsheets/d/1WI8seKlAwl3DWGoMC83eWvdm15YYlwfMIdjg6vFx-pQ/edit). Update in place; never duplicate.
 - Never re-ask the owner a settled fact. Before any question, search the owner's established-facts register
   (Drive "00 ESTABLISHED FACTS"), prior handoffs and the project's source-of-truth files; ask only what none of
   them answers, and record every new answer in the register the same day.
