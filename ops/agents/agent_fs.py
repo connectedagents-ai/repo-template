@@ -279,7 +279,7 @@ def bullet(e):
 def cmd_render(a):
     root, pack = a.root, read_jsonl(a.root / "memory/pack.jsonl")
     agents = load_agents(root)
-    newest = max([e["updated_at"] for e in pack] + ["never"]) if pack else "never"
+    newest = max(e["updated_at"] for e in pack) if pack else "never"
     decisions = root / "chairman/principal_decisions.yaml"
     open_items = len(re.findall(r"\bOPEN\b", decisions.read_text())) if decisions.exists() else 0
     out = {}

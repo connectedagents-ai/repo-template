@@ -56,6 +56,7 @@ class AgentFsTest(TempDirTest):
         readme = (self.root / "README.md").read_text()
         self.assertTrue(readme.startswith("<!-- GENERATED"))
         self.assertIn("chief-of-staff", readme)
+        self.assertIn("Last updated 2099-01-02", readme)
         self.assertIn("Houston", (self.root / "agents/chief-of-staff/memory/MEMORY.md").read_text())
         self.assertIn("Houston", (self.root / "tools/chatgpt/paste.md").read_text())
         self.assertIn("rendered 0 changed files", self.afs("render", "--root", self.root, "--apply").stdout)
