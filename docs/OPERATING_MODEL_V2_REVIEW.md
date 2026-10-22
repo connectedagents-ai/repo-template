@@ -141,7 +141,7 @@ Owner's decisions, batched:
 status_vocabulary: [FILED-ACTIVE, POST-JUDGMENT, ON-APPEAL, ADMINISTRATIVE-ACTIVE, CLOSED, POTENTIAL-NOT-FILED, PARKED]
 matters:
   - {matter_id: MAT-MUL, title: "Mullins v. Connected Solar", cause_number: "2024-CI-17193", status: POST-JUDGMENT, note: "order compelling production", project_id: PRJ-LF-ONTOLOGY}
-  - {matter_id: MAT-WIN, title: "Winchell", status: ON-APPEAL, project_id: PRJ-LF-ONTOLOGY}
+  - {matter_id: MAT-WIN, title: "Winchell", status: FILED-ACTIVE, posture: "won on appeal; new developments expected", project_id: PRJ-LF-ONTOLOGY}
   - {matter_id: MAT-LEE, title: "Lee v. Connected Solar & Bailey", cause_number: "23-DCV-301569", status: FILED-ACTIVE, project_id: PRJ-LF-ONTOLOGY}
   - {matter_id: MAT-TSL, title: "Tesla program", status: POTENTIAL-NOT-FILED, project_id: PRJ-LF-CENERGY-TESLA}
   - {matter_id: MAT-IRS, title: "IRS collection / OIC", status: ADMINISTRATIVE-ACTIVE, project_id: PRJ-FIN-INCOMETAX-ROBERTBAILEY}

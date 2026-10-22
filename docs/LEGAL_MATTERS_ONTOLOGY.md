@@ -21,7 +21,7 @@ re-asked.
 | Key | Matter | Status |
 |---|---|---|
 | MUL | Mullins v. Connected Solar, 2024-CI-17193 | POST-JUDGMENT (compelled production) |
-| WIN | Winchell | ON-APPEAL |
+| WIN | Winchell | FILED-ACTIVE: lost at the first level, won on appeal; new developments expected (owner, 2026-10-22) |
 | LEE | Lee v. Connected Solar & Bailey, 23-DCV-301569 (defense counsel withdrew Apr 2026) | FILED-ACTIVE (verify posture) |
 | TSL | Tesla program umbrella (Tesla, Vikta, Solytx, related parties) | POTENTIAL-NOT-FILED; RICO PARKED |
 | CUS | Customer disputes | per matter |
