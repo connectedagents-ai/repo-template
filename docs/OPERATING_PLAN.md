@@ -15,13 +15,15 @@ This file holds process only. Case facts, amounts and client data live in Google
 ## 2. Where things live (the only durable stores)
 | What | Where | Durable? |
 |---|---|---|
-| All files, outputs, reports, workbooks | Google Drive master folder "1Bailey Financials 2018-2026 YTD - Tax, IRS, Assets and Liabilities Only" (https://drive.google.com/drive/folders/121X1o4QU7r5YPs8uB58d878XAfqNGtSj), in its existing subfolders | Yes |
+| Financial, tax and Mullins files, outputs, workbooks | Google Drive financial master folder "1Bailey Financials 2018-2026 YTD - Tax, IRS, Assets and Liabilities Only" (https://drive.google.com/drive/folders/121X1o4QU7r5YPs8uB58d878XAfqNGtSj), in its existing subfolders | Yes |
+| All legal matters (MUL, WIN, LEE, TSL, CUS, IRS, EVC), per `LEGAL_MATTERS_ONTOLOGY.md` | Google Drive **LEGAL MATTERS** (https://drive.google.com/drive/folders/1Pv-i27zSgoAMYC1JvHaVkos98jpYqL53). The frozen 14 Mullins Production folder stays in the financial master folder; LEGAL MATTERS links to it with a shortcut | Yes |
+| Master plan and requirements register | Drive sheet "00 MASTER PLAN + REQUIREMENTS REGISTER" (https://docs.google.com/spreadsheets/d/111QyaBWdGU7wkgxu4D2QDw6XMXX-gEVpgrGUJtp_6WA/edit) | Yes |
 | Settled facts | Drive doc "00 ESTABLISHED FACTS" (in 14 Mullins / 07 Working) | Yes |
 | Rules, start-up steps, task board | Drive doc "00 READ FIRST" (in 07 Working), this file, `AGENTS.md` | Yes |
 | Artifact list | Drive sheet "project registry" (link in `AGENTS.md`) | Yes |
 | Cloud scratchpad, `/root/.claude/*`, chat memory | the container | **No: never the only copy** |
 
-Never create a new master folder, tracker, registry or facts document. Update the existing one in place.
+There are exactly two roots, the financial master folder and LEGAL MATTERS. 00_MASTER_INTAKE is only an inbox. Never create another root folder, tracker, registry or facts document. Update the existing one in place.
 
 ## 3. Session start (every agent, every tool)
 1. Read `AGENTS.md`, this file, "00 READ FIRST" and "00 ESTABLISHED FACTS".
