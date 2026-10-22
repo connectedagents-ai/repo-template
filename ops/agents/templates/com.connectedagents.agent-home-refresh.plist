@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Nightly 03:00 local refresh (Chairman cadence). Edit the two paths, then:
+     cp this file ~/Library/LaunchAgents/ && launchctl load ~/Library/LaunchAgents/com.connectedagents.agent-home-refresh.plist -->
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key><string>com.connectedagents.agent-home-refresh</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>/bin/bash</string>
+    <string>/Users/YOU/Code/connectedagents-ai/repo-template/ops/agents/refresh.sh</string>
+    <string>--root</string>
+    <string>/Users/YOU/Code/connectedagents-ai/AGENT-HOME-REPO</string>
+    <string>--apply</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer></dict>
+  <key>StandardOutPath</key><string>/tmp/agent-home-refresh.log</string>
+  <key>StandardErrorPath</key><string>/tmp/agent-home-refresh.log</string>
+</dict>
+</plist>

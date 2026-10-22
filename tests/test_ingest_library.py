@@ -23,6 +23,15 @@ class IngestLibraryTest(TempDirTest):
     def catalog(self):
         return json.loads((self.lib / "catalog.json").read_text(encoding="utf-8"))
 
+    def test_kind_memory_files_everything_under_memory(self):
+        self.exp.mkdir()
+        (self.exp / "saved-memories.md").write_text("- Lives in Houston\n")
+        (self.exp / "custom-instructions.txt").write_text("Be brief.\n")
+        self.run_py(INGEST, "--source", "chatgpt", "--account", "personal", "--library", self.lib, "--min-free-gb", 0,
+                    "--kind", "memory", "--apply", self.exp)
+        self.assertEqual({e["kind"] for e in self.catalog().values()}, {"memory"})
+        self.assertTrue((self.lib / "sources/chatgpt/personal/memory/saved-memories.md").exists())
+
     def test_skill_copy_skips_secrets_and_symlinks(self):
         skill = self.exp / "my-skill"
         skill.mkdir(parents=True)

@@ -344,6 +344,10 @@ are the governance; this file and `ops/` are the execution; the Personal OS is t
 | GOV-RISK | scanner + `find_plaintext_keys.py`; Phase −1 | 0–1 |
 | GOV-BRIEF | skill `morning-brief` (adds what ran, what needs approval) | daily |
 
+**Merged home:** the Chairman instructions become `chairman/CHAIRMAN.md` v0.2 (v0.1 + this file's waves) in the private agent home, and its
+`principal_decisions.yaml` absorbs the account register of §2. Every agent above gets a folder with `AGENT.md`, a generated README and a generated
+memory view, and every tool reads one shared memory pack: [`AGENT-FILESYSTEM.md`](AGENT-FILESYSTEM.md) (`ops/agents/agent_fs.py`, `refresh.sh`).
+
 Supabase stays the system of record for **data registers** (entities, memory pack) as the Chairman doc says; git stays the home of
 **rules, skills, ontology and code**. The task sources are Todoist (personal and business) and Linear (dev work); add Todoist to the account register.
 
