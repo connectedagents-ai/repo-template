@@ -19,7 +19,9 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Experiments go on a branch or in `connectedagents-ai/agent-lab`, not in a new repo.
 - **The one master folder:** Google Drive > My Drive > `1Bailey Financials 2018-2026 YTD - Tax, IRS, Assets and Liabilities Only`
   (https://drive.google.com/drive/folders/121X1o4QU7r5YPs8uB58d878XAfqNGtSj). Every deliverable is saved into its existing
-  subfolders. Never create another master or root folder.
+  subfolders. Legal matters live in the owner-requested **LEGAL MATTERS** folder
+  (https://drive.google.com/drive/folders/1Pv-i27zSgoAMYC1JvHaVkos98jpYqL53), structured per `docs/LEGAL_MATTERS_ONTOLOGY.md`.
+  Never create another master or root folder.
 - **File intake (until the owner says otherwise):** every new, loose or unsorted file goes to Google Drive >
   My Drive > `00_MASTER_INTAKE` (https://drive.google.com/drive/folders/1gSKjscg0lJGdOVuhPbCXrRC-EUQiJQhd),
   never the Mac Desktop or Downloads. Files leave intake only through the shared regex rules into the Global
