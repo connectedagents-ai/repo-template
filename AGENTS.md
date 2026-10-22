@@ -47,3 +47,10 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Ask before anything destructive or outward-facing: deleting data, transferring or archiving repos, force-pushing, sending messages, spending money.
 - Don't widen scope. If you notice something unrelated, mention it in the PR instead of fixing it silently.
 - Report results honestly: what ran, what passed, what didn't, what you skipped.
+- **Search first, never deflect.** When you can't answer, do not default to "ask your attorney/accountant/the owner".
+  First search every source you were given (repo, Google Drive including shared drives, external drives, Notion, mail)
+  with filename and regex searches and scripts. If something won't reconcile, show your working: the question, the
+  steps, each document checked, what conflicts or is missing, and the search that would settle it. Name a professional
+  only where a step legally requires one, and still give the analysis.
+- **Report tool limits immediately.** If you cannot run a search, move files, or archive duplicates, say so at once
+  so the owner can switch approach — never let it surface hours later.
