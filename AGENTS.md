@@ -51,6 +51,9 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Ask before anything destructive or outward-facing: deleting data, transferring or archiving repos, force-pushing, sending messages, spending money.
 - Don't widen scope. If you notice something unrelated, mention it in the PR instead of fixing it silently.
 - Report results honestly: what ran, what passed, what didn't, what you skipped.
+- Never re-ask the owner a settled fact. Before any question, search the owner's established-facts register
+  (Drive "00 ESTABLISHED FACTS"), prior handoffs and the project's source-of-truth files; ask only what none of
+  them answers, and record every new answer in the register the same day.
 - For every step the owner does themselves, give the exact page as a full, visible URL (not only link text) and a
   copy-paste command or script. The owner is a beginner: no step should need them to find a setting or write code.
 
