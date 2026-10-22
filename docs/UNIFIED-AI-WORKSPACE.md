@@ -301,6 +301,19 @@ Start now with phase 0 and phase 1: list which keys need rotating (names only), 
 from the account table in §2. Stop and show me the draft before going further.
 ```
 
+## 5. Running it with subagents
+Split the work into waves; agents in a wave run in parallel, and no wave starts before the one above is done. Agents on the **Mac**
+(Claude Code with Desktop Commander) do local file work; **cloud** sessions do GitHub PRs. Every agent stops at its dry-run report;
+`--apply` runs only after you approve it. Reports go to `~/ops-reports/` and the private store, never into a public repo.
+
+| Wave | Agents (where) | Job | Gate |
+|---|---|---|---|
+| 0 · You | — | Phase −1 steps 1–2: cut the attacker's access, disable Actions | Actions off |
+| 1 · Contain | `scanner` (cloud): `ops/security/scan_infected_repos.sh` across both orgs, every branch · `secret-inventory` (Mac): `find_plaintext_keys.py` + Actions secret names → rotation list · `repo-cleaner` ×N (cloud): one PR per infected repo | scanner re-run reports 0 infected |
+| 2 · Documents | `doc-scan` (Mac): `dedup_scan.py --root <folder> --ext … --skip-repos` → `dedup_merge.py` · `doc-dedup` (Mac): `dedup_apply.py` · `drive-consolidate` (Mac): `consolidate_to_drive.py` · `matter-memory`: matter brief into the private store + a Claude Project instruction | you approve PLAN.md; `rclone check` shows 0 missing |
+| 3 · Workspace | `inventory`, `code-push`, `export-<tool>` ×1 per account, `skills`, `tool-config` + `mcp`, `ontology`, `api-env` + `deploy`: phases 1–9 above | each phase's "Done when" |
+| 4 · GitHub declutter | `org-classify` (cloud): `migrate_to_connectedagents.sh <old-org>` dry run → classification sheet + what costs money · `org-migrate`: transfer, fold with `merge_into_monorepo.sh`, archive the rest · `org-declutter`: same inside the main org, close stale agent branches/PRs · **you**: remove the old org's seats and Copilot, downgrade or cancel it | old org has 0 active repos; its next invoice is $0 |
+
 ## Sources (checked 2026-10-22)
 - OpenAI Codex: [Agent Skills](https://developers.openai.com/codex/skills) (skills folder; `~/.agents/skills` per community guides such as [this one](https://codex.danielvaughan.com/2026/05/05/agent-skills-open-standard-portable-skills-codex-cli-cross-agent/))
 - Cursor: [Agent Skills](https://cursor.com/docs/skills) (`.cursor/skills`, `.agents/skills`, `~/.cursor/skills`, `~/.agents/skills`, plus `.claude/skills` and `.codex/skills`)

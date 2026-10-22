@@ -3,12 +3,14 @@
 
     python3 dedup_scan.py --surface mac-local --root ~/Desktop --root ~/Documents --out <dir>
     python3 dedup_scan.py --surface icloud-drive --root "~/Library/Mobile Documents/com~apple~CloudDocs" --out <dir>
+    python3 dedup_scan.py --surface sort --root ~/Desktop/"DESKTOP SORT" --ext pdf --ext xlsx --skip-repos --out <dir>
 
 Writes <dir>/inventory-<surface>.csv: surface, path, size, mtime, local (0/1), legal (0/1).
 Never reads file contents here (hashing happens only in dedup_merge.py, and only for size collisions).
 iCloud-safe: files that are not downloaded (macOS "dataless" flag, or old-style .<name>.icloud placeholders)
 are recorded with local=0 and are never opened, so no download is ever triggered.
 Legal-looking paths are flagged legal=1; later phases never plan to move them.
+--ext limits the scan to those file types; --skip-repos skips every folder that is a git repo (its tracked files too).
 """
 import argparse, csv, os, re, stat, sys
 from pathlib import Path
@@ -22,6 +24,17 @@ DEFAULT_LEGAL = (r"tesla|connected[ _-]?solar|netzero|net[ _-]?zero|dorellyn|mul
                  r"court|legal|privileged|deposition|subpoena|discovery[ _-]?production|evidence|golden[ _-]?packet")
 
 
+def extension(name):
+    return os.path.splitext(name.removesuffix(".icloud"))[1].lower().lstrip(".")
+
+
+def keep_dir(dirpath, d, root_dev, skip_repos):
+    full = os.path.join(dirpath, d)
+    return (d not in SKIP_DIRS and not d.endswith(SKIP_SUFFIXES)
+            and os.lstat(full).st_dev == root_dev  # stay on this volume
+            and not (skip_repos and os.path.lexists(os.path.join(full, ".git"))))
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--surface", required=True, help="label, e.g. mac-local, gdrive-powerconnection, onedrive-onewishlabs, icloud-drive")
@@ -29,8 +42,11 @@ def main():
     ap.add_argument("--out", required=True, type=Path)
     ap.add_argument("--legal-pattern", default=DEFAULT_LEGAL, help="regex; matching paths are flagged and never moved")
     ap.add_argument("--min-size", type=int, default=1, help="ignore files smaller than this many bytes")
+    ap.add_argument("--ext", action="append", default=[], help="only these file types, e.g. --ext pdf --ext xlsx (repeatable)")
+    ap.add_argument("--skip-repos", action="store_true", help="skip every folder containing .git: whole repos, not just .git")
     a = ap.parse_args()
     legal = re.compile(a.legal_pattern, re.I)
+    exts = {e.lower().lstrip(".") for e in a.ext}
     a.out.mkdir(parents=True, exist_ok=True)
     out = a.out / f"inventory-{re.sub(r'[^A-Za-z0-9._-]', '_', a.surface)}.csv"
     n = local = placeholders = flagged = errors = 0
@@ -44,10 +60,9 @@ def main():
                 continue
             root_dev = os.stat(root).st_dev
             for dirpath, dirnames, filenames in os.walk(root, onerror=lambda e: None):  # does not follow symlinks
-                dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not d.endswith(SKIP_SUFFIXES)
-                               and os.lstat(os.path.join(dirpath, d)).st_dev == root_dev]  # stay on this volume
+                dirnames[:] = [d for d in dirnames if keep_dir(dirpath, d, root_dev, a.skip_repos)]
                 for name in filenames:
-                    if name == ".DS_Store":
+                    if name == ".DS_Store" or (exts and extension(name) not in exts):
                         continue
                     p = os.path.join(dirpath, name)
                     try:
