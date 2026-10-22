@@ -60,6 +60,22 @@ class AgentFsTest(TempDirTest):
         self.assertIn("Houston", (self.root / "tools/chatgpt/paste.md").read_text())
         self.assertIn("rendered 0 changed files", self.afs("render", "--root", self.root, "--apply").stdout)
 
+    def test_import_agents_converts_codex_toml_and_keeps_existing(self):
+        src = self.tmp / "codex-agents"
+        src.mkdir()
+        (src / "case-analyst.toml").write_text('name = "case-analyst"\ndescription = "Analyzes litigation: case files"\n'
+                                               'developer_instructions = """Read the record."""\n')
+        (src / "code-reviewer.toml").write_text('name = "code-reviewer"\ndescription = "Reviews diffs"\n')
+        (src / "broken.toml").write_text("name = \n")
+        self.afs("init", "--root", self.root, "--apply")
+        r = self.afs("import-agents", "--root", self.root, "--source", src, "--apply")
+        self.assertIn("imported 2 agents", r.stdout)
+        legal = (self.root / "agents/case-analyst/AGENT.md").read_text()
+        self.assertIn("memory_namespaces: [core, privileged]", legal)
+        self.assertIn("Read the record.", legal)
+        self.assertIn("[core, engineering]", (self.root / "agents/code-reviewer/AGENT.md").read_text())
+        self.assertIn("2 already present", self.afs("import-agents", "--root", self.root, "--source", src, "--apply").stdout)
+
     def test_restricted_namespace_is_pointer_only(self):
         self.afs("init", "--root", self.root, "--apply")
         f = self.tmp / "fo.md"

@@ -135,6 +135,34 @@ def cmd_init(a):
     print(f"{'created' if a.apply else 'would create'} {made} files ({len(files) - made} already present)")
 
 
+# ---------- import agents from other systems ----------
+LEGAL = re.compile(r"litigat|privilege|deposition|filing|case-|rico|evidence|damages|claims|contract|legal", re.I)
+
+
+def cmd_import_agents(a):
+    """Codex agent TOML (name, description, developer_instructions) -> agents/<name>/AGENT.md. Existing AGENT.md files are kept."""
+    import tomllib
+    made = kept = 0
+    for p in sorted(a.source.glob("*.toml")):
+        try:
+            d = tomllib.loads(p.read_text())
+        except (tomllib.TOMLDecodeError, UnicodeDecodeError) as e:
+            print(f"skip {p.name}: {e}")
+            continue
+        agent_id = re.sub(r"[^a-z0-9-]+", "-", str(d.get("name") or p.stem).lower()).strip("-")
+        dest = a.root / "agents" / agent_id / "AGENT.md"
+        if dest.exists():
+            kept += 1
+            continue
+        role = " ".join(str(d.get("description", "")).split()).replace(":", " -")[:200]
+        ns = "core,privileged" if LEGAL.search(f"{agent_id} {role}") else "core,engineering"
+        text = agent_md(agent_id, a.system, role or agent_id, "T2", ns).replace(
+            "Follow AGENTS.md", f"Imported from {a.system}: {p.name}.\n\n{d.get('developer_instructions', '').strip()}\n\nFollow AGENTS.md")
+        made += write(dest, text, a.apply)
+        write(dest.parent / "receipts/.keep", "", a.apply, quiet=True)
+    print(f"{'imported' if a.apply else 'would import'} {made} agents ({kept} already present)")
+
+
 # ---------- memory import ----------
 def parse_items(path):
     """Yield (body, key, extra) from JSONL records, Markdown bullets/lines or plain text lines."""
@@ -376,13 +404,16 @@ def main():
     mrg = mem.add_parser("merge")
     mrg.add_argument("--root", required=True, type=lambda s: Path(s).expanduser())
     mrg.add_argument("--apply", action="store_true")
+    ia = add("import-agents", help="convert another system's agent definitions (Codex TOML) into agents/<id>/AGENT.md")
+    ia.add_argument("--source", required=True, type=lambda s: Path(s).expanduser(), help="folder of *.toml agent files")
+    ia.add_argument("--system", default="codex")
     add("render", help="regenerate READMEs, memory views and tools/*")
     add("sync", help="install tools/* into each tool's global file (backed up)")
     a = ap.parse_args()
     if a.cmd == "memory":
         cmd_import(a) if a.mcmd == "import" else cmd_merge(a)
     else:
-        {"init": cmd_init, "render": cmd_render, "sync": cmd_sync}[a.cmd](a)
+        {"init": cmd_init, "import-agents": cmd_import_agents, "render": cmd_render, "sync": cmd_sync}[a.cmd](a)
 
 
 if __name__ == "__main__":
