@@ -24,7 +24,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from quickxorhash import QuickXorHash  # noqa: E402  (OneDrive / SharePoint checksum)
 
-NOISE = re.compile(r"(\s*\(\d+\)|[ _-]*copy( \d+)?|[ _-]*v\d+|[ _-]*final|[ _-]*\d{4}[-_.]?\d{2}[-_.]?\d{2}(t\d+z?)?|[ _-]*\d{6,})$", re.I)
+NOISE = re.compile(r"(\s*\(\d+\)|\s\d{1,2}|[ _-]*copy([ _-]?\d+)?|[ _-]*v\d+|[ _-]*final|[ _-]*\d{4}[-_.]?\d{2}[-_.]?\d{2}(t\d+z?)?|[ _-]*\d{6,})$", re.I)
 
 
 HASHERS = {"sha256": hashlib.sha256, "sha1": hashlib.sha1, "md5": hashlib.md5, "quickxor": QuickXorHash}
@@ -52,6 +52,12 @@ def find(parent, i):
         parent[i] = parent[parent[i]]
         i = parent[i]
     return i
+
+
+def numbered_copy(path):
+    """True for "Report (1).pdf", "Report 2.pdf", "Report copy.pdf", "Report-copy-3.pdf"."""
+    stem = os.path.splitext(os.path.basename(path))[0]
+    return bool(re.search(r"(\s*\(\d+\)|[ _-]copy([ _-]?\d+)?|\s\d{1,2})$", stem, re.I))
 
 
 def norm_name(path):
@@ -133,7 +139,8 @@ def main():
         w = csv.writer(f)
         w.writerow(["group", "sha256", "size", "action", "surface", "path", "hashes"])
         for gi, (h, g) in enumerate(sorted(groups.items(), key=lambda kv: -kv[1][0]["size"] * len(kv[1])), 1):
-            g.sort(key=lambda r: (rank.get(r["surface"], len(rank)), len(r["path"]), r["mtime"]))
+            # keep the clean name: "Report.pdf" over "Report (1).pdf" / "Report copy.pdf", then the shortest path
+            g.sort(key=lambda r: (rank.get(r["surface"], len(rank)), numbered_copy(r["path"]), len(r["path"]), r["mtime"]))
             keeper = g[0]
             legal = any(r["legal"] for r in g)
             for r in g:

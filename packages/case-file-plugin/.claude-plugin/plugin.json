@@ -1,0 +1,6 @@
+{
+  "name": "case-file",
+  "version": "0.1.0",
+  "description": "Find, de-duplicate and file every record for a lawsuit across the Mac, the SSD and Google Drive, then build chronologies, people maps, claim-to-evidence matrices, deposition outlines, jury timelines and a litigation-finance brief from them. Case data stays on the owner's SSD.",
+  "author": {"name": "Power Connection"}
+}

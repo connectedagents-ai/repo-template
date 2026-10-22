@@ -17,6 +17,15 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Before creating a file, look for an existing one that already does the job. **Never** create copies such as `-v2`, `-final`, `-new`, `copy`,
   or date-stamped duplicates. Use git history and branches instead.
 - Experiments go on a branch or in `connectedagents-ai/agent-lab`, not in a new repo.
+- **The one master folder:** Google Drive > My Drive > `1Bailey Financials 2018-2026 YTD - Tax, IRS, Assets and Liabilities Only`
+  (https://drive.google.com/drive/folders/121X1o4QU7r5YPs8uB58d878XAfqNGtSj). Every deliverable is saved into its existing
+  subfolders. Legal matters live in the owner-requested **LEGAL MATTERS** folder
+  (https://drive.google.com/drive/folders/1Pv-i27zSgoAMYC1JvHaVkos98jpYqL53), structured per `docs/LEGAL_MATTERS_ONTOLOGY.md`.
+  Never create another master or root folder.
+- **File intake (until the owner says otherwise):** every new, loose or unsorted file goes to Google Drive >
+  My Drive > `00_MASTER_INTAKE` (https://drive.google.com/drive/folders/1gSKjscg0lJGdOVuhPbCXrRC-EUQiJQhd),
+  never the Mac Desktop or Downloads. Files leave intake only through the shared regex rules into the Global
+  Ontology domains, in logged batches the owner approves. Secrets never go to intake; they go to 1Password.
 
 ## 2. Workflow
 - Branch per task: `<type>/<short-slug>` (`feat/`, `fix/`, `chore/`, `docs/`). Agents may use their tool prefix (`claude/`, `codex/`, `cursor/`, `devin/`).
@@ -47,3 +56,53 @@ Grok CLI, Devin and Warp all read this file, directly or through a one-line poin
 - Ask before anything destructive or outward-facing: deleting data, transferring or archiving repos, force-pushing, sending messages, spending money.
 - Don't widen scope. If you notice something unrelated, mention it in the PR instead of fixing it silently.
 - Report results honestly: what ran, what passed, what didn't, what you skipped.
+- Owner operating rules for all agents and LLMs: https://docs.google.com/document/d/1OoyYTeCVJB2V3QQW0CuP-9Kxf1w3qnY48MsIpQBR3eM/edit
+  Every output goes to Drive `00_MASTER_INTAKE/_AGENT_OUTPUTS/<tool>/` with a handoff header, and every new or
+  superseded artifact gets a row in the project registry
+  (https://docs.google.com/spreadsheets/d/1WI8seKlAwl3DWGoMC83eWvdm15YYlwfMIdjg6vFx-pQ/edit). Update in place; never duplicate.
+- Segment and capture every work product and confirmation per `docs/WORK_PRODUCT_AND_CONFIRMATIONS.md` (Ledger tab of the master plan sheet).
+- Follow `docs/OPERATING_PLAN.md` (durable stores, session start/end steps). The cloud container is never the only copy.
+- **LitigationForce material is reference only** (owner, 2026-10-22). Use it only to guide the ontology, folder structure,
+  regex and file review. Nothing else: never as case facts, never in filings or productions, never to build or run the platform.
+- **No "questions for counsel"** (owner, 2026-10-22). An unresolved item means the research isn't finished. Label it
+  "research incomplete: <what is missing>", keep researching, then give the owner the facts and options so he can decide.
+  An item goes to a lawyer only after the owner says he doesn't have an answer.
+- Never re-ask the owner a settled fact. Before any question, search the owner's established-facts register
+  (Drive "00 ESTABLISHED FACTS"), prior handoffs and the project's source-of-truth files; ask only what none of
+  them answers, and record every new answer in the register the same day.
+- For every step the owner does themselves, give the exact page as a full, visible URL (not only link text) and a
+  copy-paste command or script. The owner is a beginner: no step should need them to find a setting or write code.
+
+## 6. Agent-run jobs: web, terminal, clicking, forms, configuration
+Choose the fastest, lowest-token path for the job. **Default to a terminal script** (`gh`, `git`, CLIs, APIs, a short
+Python/bash script); use browser clicking only for what has no CLI or API (billing, some settings, OAuth approval).
+Batch similar steps into one script instead of doing them one by one.
+
+Size the job first; the smallest size that fits wins:
+- **Just do it**: read-only or trivially reversible local work (look something up, run a status check, list files).
+  Report in one line.
+- **Quick confirm**: a one-off, simple job (about 3 steps or fewer, one target) that isn't destructive, paid or
+  outward-facing. One line of intent and target ("Rename X to Y in repo Z. OK?"), answered yes or no by button or
+  voice. Afterwards, one line of result with proof.
+- **Full checklist** (below): several steps or targets, anything that deletes, revokes, pays, sends, publishes or
+  touches credentials, anything that can't be undone, or a tool the agent hasn't checked yet.
+
+A full-checklist job follows three steps:
+1. **Pre-job checklist, shown before starting.** Goal and done-when · every page (full URL), command and file it will
+   touch · tools it needs, checked to be present and signed in (e.g. `gh auth status`, browser connected, `python3`,
+   `node`, the SSD mounted), installing what's missing only with a copy-paste command the owner approves · which steps
+   need the owner (logins, 2FA, payments, deletions) · how to undo it. Wait for the owner's OK.
+2. **Do the job**, pausing at each step that needs the owner.
+3. **Confirmation list after finishing.** Each checklist item marked done / failed / skipped, with proof (the command
+   output, the page state, a screenshot) · what changed and where · anything left for the owner, as full URLs and
+   copy-paste commands.
+
+## 7. Standing authority: what agents may do for the owner without asking
+Agents working for the owner on the Mac, dev tools, repos and templates may do these **without asking** (report after):
+read anything except secrets · run previews, dry-runs, audits, `make lint`, `make test` · install the rule files and
+tools listed by `ops/cowork/bootstrap_mac.sh` · create branches, commit, push agent branches and open PRs · refactor
+code on a branch (the owner merges) · move clutter into `~/Archive/<topic>-<YYYYMMDD>/` with a restore script.
+**Always ask first** (quick confirm or full checklist, §6): deleting anything, merging to `main`, force-pushing,
+changing account, billing, org or security settings, revoking access, sending or publishing, and anything touching
+client or case data. **Who decides:** agents plan, prepare, track and build; the owner sets priorities and makes the
+legal, money and external calls ("the agent prepares, the owner decides").

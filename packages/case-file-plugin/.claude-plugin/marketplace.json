@@ -1,0 +1,5 @@
+{
+  "name": "powerconnection-plugins",
+  "owner": {"name": "Power Connection"},
+  "plugins": [{"name": "case-file", "source": "./", "description": "Organize a lawsuit's records and build court, deposition, jury and litigation-finance materials."}]
+}

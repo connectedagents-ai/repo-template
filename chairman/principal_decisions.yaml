@@ -1,0 +1,59 @@
+# Principal decisions required by CHAIRMAN_AGENT_INSTRUCTIONS_v0.1 §11.
+# Pre-filled 2026-10-22 from decisions the owner has already made (see AGENTS.md, docs/OPERATING_PLAN.md, the Drive
+# "00 ESTABLISHED FACTS" doc). Items marked OPEN still need the owner. No credentials go in this file, ever.
+version: 0.1
+recorded_by: claude-code (pre-fill from settled decisions; owner to confirm OPEN items)
+date: 2026-10-22
+
+devices:
+  - host: owner-primary-mac
+    paths: ["~/Desktop (incl. Desktop Review, DESKTOP SORT)", "~/Documents", "~/Downloads", "~/Developer",
+            "~/.cursor", "~/.claude", "~/.codex", "~/.grok", "/Volumes/* (every attached SSD)"]
+    status: named by owner; inventory never run (cloud session cannot reach the Mac)
+  - host: victoria-macbook-air
+    status: OPEN (listed as a default in v0.1; the owner has not named it)
+
+repos:
+  github_orgs: [connectedagents-ai, Connected-Energy-AI, powerconnectionai]
+  canonical_litigationforce: connectedagents-ai/LitigationForce.AI
+  status: about 190 connectedagents-ai repos and the powerconnectionai repos are not yet attached to Claude sessions
+
+drives:
+  google_drive:
+    account: owner Workspace account
+    roots:                       # the only two roots; 00_MASTER_INTAKE is the inbox
+      financial_master: 121X1o4QU7r5YPs8uB58d878XAfqNGtSj
+      legal_matters: 1Pv-i27zSgoAMYC1JvHaVkos98jpYqL53
+      intake: 1gSKjscg0lJGdOVuhPbCXrRC-EUQiJQhd
+  onedrive_sharepoint: owner M365 tenant (swept read-only 2026-10-22)
+  dropbox: OPEN
+
+system_of_record:
+  files_and_evidence: Google Drive (the two roots)       # owner rule, 2026-10-22
+  structured_registers: OPEN                              # v0.1 says Supabase core.*; owner to confirm
+  plan_and_requirements: "Drive sheet 00 MASTER PLAN + REQUIREMENTS REGISTER (111QyaBWdGU7wkgxu4D2QDw6XMXX-gEVpgrGUJtp_6WA)"
+
+cloud_accounts: OPEN   # AWS, GCP, Azure, Vercel, Supabase, Cloudflare, Neon, MotherDuck; read-only credentials via 1Password only
+
+llm_accounts:
+  platforms: [ChatGPT, Claude, Grok/xAI, Gemini, Perplexity, Cursor, Claude Code, Codex, M365 Copilot, personal Copilot, Notion AI]
+  credential_handoff: 1Password or the platform's native export only; never chat text
+  status: native exports for ChatGPT, Grok, Perplexity threads and personal Copilot are owner actions
+
+retention:
+  rule: archive, never delete; deletions need an approval ticket with a rollback plan
+  airtable_vs_attio: OPEN
+
+approvers:
+  default: Robert A. Bailey, Jr.
+  litigation_scope: licensed counsel (privilege calls, productions, filings)
+  tax_scope: CPA Doug Dickey (DRDA) for filed-return questions
+  backup_approver: OPEN
+
+escalation_channel: OPEN   # in-app, email or Slack
+
+standing_rules:
+  - LitigationForce material is reference only (ontology, folders, regex, file review)
+  - Produce everything responsive in Mullins; exclusions only out-of-scope with a written reason; privilege to counsel
+  - Never re-ask settled facts; batch questions at the end
+  - Nothing exists only in a chat or container; outputs are saved to the Drive roots

@@ -1,0 +1,17 @@
+# Document types for a litigation case file. Use with --categories (replaces the financial categories) and
+# --layout type. Generic words only: names of people, companies, customers and projects go in your local
+# --entities file on the SSD, never in this repo. Folder numbers keep the collection in a working order.
+01-pleadings-court: \bpetition\b|complaint|\banswer\b|motion\s*(to|for)|\border\b|court|cause\s*no|docket|filed|citation|summons|subpoena|brief|judgment|hearing|\bdtpa\b|notice\s*letter|demand\s*letter
+02-agreements: agreement|contract|\bmnda\b|\bnda\b|non[-\s]*disclosure|non[-\s]*circumvent(ion)?|non[-\s]*compete|consulting|licens(e|ee|or)|certified\s*installer|\bcia\b|\bepc\b|amendment|addendum|terms\s*and\s*conditions|signed|docusign
+03-correspondence: \.eml$|email|\bre:|\bfwd?:|letter|memo|text\s*messages?|imessage|slack|teams\s*chat|linkedin\s*message
+04-transcripts-recordings: transcript|recording|\.m4a$|\.mp3$|\.wav$|\.mp4$|\.mov$|voicemail|call\s*notes|meeting\s*notes|minutes|otter|fireflies|zoom
+05-damages-financial: damages|lost\s*profits?|invoice|purchase\s*order|\bpo\b|pricing|price\s*increase|quote|proposal|pipeline|gross\s*profit|p\s*&\s*l|financial|bank|tax|\bitc\b|payment|ledger|budget
+06-customers-projects: customer|homeowner|project|site\s*survey|install(ation)?|permit|roof|powerwall|solar|underlayment|warranty|change\s*order
+07-people-employment: employee|employment|offer\s*letter|resignation|termination|hr\b|payroll|org\s*chart|resume|linkedin\s*profile|onboarding
+08-timeline-chronology: timeline|chronology|key\s*events|sequence\s*of\s*events|case\s*summary|legal\s*case\s*summary|fact\s*summary
+09-discovery: discovery|interrogator|request\s*for\s*production|\brfp\b|request\s*for\s*admission|production|bates|privilege\s*log|preservation|litigation\s*hold
+10-deposition-prep: deposition|depo\b|witness|outline|cross[-\s]*exam|examination|declaration|affidavit|testimony
+11-trial-jury: trial|jury|voir\s*dire|exhibit\s*list|demonstrative|opening\s*statement|closing|charge\s*of\s*the\s*court
+12-litigation-finance: litigation\s*financ|funding|funder|pitch\s*deck|investor|term\s*sheet|case\s*valuation|underwriting|deck
+13-media-social: screenshot|photo|\.png$|\.jpe?g$|\.heic$|instagram|facebook|youtube|tiktok|review|thumbtack|press|article|post
+14-marketing-product: marketing|brochure|spec\s*sheet|datasheet|hail\s*rating|class\s*[34]|presentation|training|certification
