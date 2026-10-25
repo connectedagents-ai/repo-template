@@ -16,7 +16,7 @@ or script that does the job, and only adds what was missing. Rules for every pha
 
 ## 0. What you end up with
 ```
-                 ┌─────────────── connectedagents-ai/config  (the hub repo, private) ────────────────┐
+                 ┌─────────── connectedagents-ai/ai-dev-workspace  (the hub repo, private) ────────────┐
                  │ AGENTS.md · ontology/ · skills/ · prompts/ · agents/ · mcp/ · tools/<tool>/ · env/  │
                  └───────┬──────────────────┬──────────────────┬──────────────────┬─────────────────┘
           symlinks on Mac│     repo template│      MCP (one set)│     op:// refs    │ connectors / APIs
@@ -28,18 +28,18 @@ or script that does the job, and only adds what was missing. Rules for every pha
                                                       └─────────────────┘
 ```
 - **One rules file** (`AGENTS.md`); every tool-specific file is a one-line pointer to it.
-- **One skills folder** (`config/skills/`), linked into every tool by `ops/skills/skills_hub.py`.
-- **One ontology** (`config/ontology/global-ontology.yaml`): names, tags, taxonomy, topology. See [`GLOBAL-ONTOLOGY.md`](GLOBAL-ONTOLOGY.md).
+- **One skills folder** (`ai-dev-workspace/skills/`), linked into every tool by `ops/skills/skills_hub.py`.
+- **One ontology** (`ai-dev-workspace/ontology/global-ontology.yaml`): names, tags, taxonomy, topology. See [`GLOBAL-ONTOLOGY.md`](GLOBAL-ONTOLOGY.md).
 - **One MCP core set** (`ops/mcp/core-servers.txt`), optionally served through one Docker MCP gateway.
 - **One secret store** (1Password); configs hold `op://` references only.
 - **One work hub** (Linear workspace Powerconnection). Every phase below is one Linear issue under project P-POW-52.
 
 ## 1. The hub repo
-**Name:** `connectedagents-ai/config`. It is the clean successor to `agent-central-config`. Never copy that repo's history:
+**Name:** `connectedagents-ai/ai-dev-workspace` (private; decided 2026-10-22, reusing the repo that already held the tools' exports instead of creating `ai-dev-workspace`). It is the clean successor to `agent-central-config`. Never copy that repo's history:
 it has live keys and case files in it ([`GITHUB-BLUEPRINT.md`](GITHUB-BLUEPRINT.md) §1). Create it from this template, then:
 
 ```
-config/
+ai-dev-workspace/
 ├── AGENTS.md                      the rules (this repo's file, with section 0 filled in)
 ├── CLAUDE.md  GEMINI.md  .github/copilot-instructions.md     one-line pointers
 ├── ontology/
@@ -59,7 +59,7 @@ config/
 └── ops/                           the scripts from this repo's ops/, with their tests
 ```
 Large libraries stay out of it: shared code goes to `platform`, the promoted prompt and skill library can live in `ai-library`
-if it outgrows `config` (see [`ops/ai-library/README.md`](../ops/ai-library/README.md)), raw exports go to the private raw store.
+if it outgrows `ai-dev-workspace` (see [`ops/ai-library/README.md`](../ops/ai-library/README.md)), raw exports go to the private raw store.
 
 ## 2. Account register (fill `register/accounts.csv` first)
 Give each login one **label** and use that label everywhere: `--account` in the ingest script, folder names in the raw store,
@@ -141,7 +141,7 @@ Code lives only in `~/Code/connectedagents-ai/<repo>` and on GitHub. Nothing bec
 ### Phase 3 · Export every AI account into the library
 For each row of §2: export → `python3 ai-library/ingest_library.py --source <tool> --account <label> <export>` (dry run, then `--apply`).
 It files raw exports into the private raw store (never git) and removes duplicates. Then **promote** the reusable pieces
-(prompts, skills, templates) into `config/` as in [ai-library "Promotion rules"](../ops/ai-library/README.md).
+(prompts, skills, templates) into `ai-dev-workspace/` as in [ai-library "Promotion rules"](../ops/ai-library/README.md).
 The full per-tool checklist is in [`ops/ai-library/README.md`](../ops/ai-library/README.md); additions:
 - **Codex (two logins):** `~/.codex/sessions/` is the transcript store. Ingest with `--source codex --account codex-<label>`.
   Cloud tasks leave branches and PRs; those are cleaned up in runbook step 9.
@@ -180,7 +180,7 @@ GitHub topics, Drive labels, SharePoint columns, Finder tags, Notion database pr
 
    | Class | Test | Goes to |
    |---|---|---|
-   | **Core** | used across companies and tools, at least monthly | `config/skills/` (linked everywhere) |
+   | **Core** | used across companies and tools, at least monthly | `ai-dev-workspace/skills/` (linked everywhere) |
    | **Domain** | one product or practice area (legal, tax, energy, voice) | that product repo's `.claude/skills/` (repo-level, loads only there) |
    | **Plugin** | maintained upstream (Anthropic, vendor plugins) | leave installed via the plugin marketplace; do not copy |
    | **Retire** | duplicate, superseded, unused 90 days, or just restates `AGENTS.md` | archive; note `supersedes:` in the survivor |
@@ -193,7 +193,7 @@ GitHub topics, Drive labels, SharePoint columns, Finder tags, Notion database pr
    `create-linear-issue`, `report-to-linear`, `open-pull-request`, `review-code`, `write-tests-first`, `run-dedup`, `file-document`
    (names and tags from the ontology), `ingest-export`, `rotate-secret`, `deploy-preview`, `write-sop`, `summarize-meeting`,
    `research-topic`. Anthropic's built-in document skills (docx, xlsx, pptx, pdf) stay plugin-managed.
-5. **Link:** `python3 ops/skills/skills_hub.py link --hub ~/Code/connectedagents-ai/config/skills` (dry run), then `--apply`.
+5. **Link:** `python3 ops/skills/skills_hub.py link --hub ~/Code/connectedagents-ai/ai-dev-workspace/skills` (dry run), then `--apply`.
    It symlinks each skill into `~/.claude/skills` (Claude Code), `~/.agents/skills` (the cross-agent folder Codex and Cursor read)
    and `~/.gemini/antigravity/skills` (Antigravity), and archives whatever was there (undo with the printed `restore.sh`).
    Add `--target .grok/skills` or others if a tool needs it. Cursor reads `~/.agents/skills` **and** `~/.claude/skills`, so it may
@@ -206,11 +206,11 @@ GitHub topics, Drive labels, SharePoint columns, Finder tags, Notion database pr
 ### Phase 6 · Agent instructions: every tool reads AGENTS.md
 Skill and rule paths drift between releases. The Codex, Cursor, Antigravity and Docker rows were checked against vendor docs on
 2026-10-22 (see Sources); the rest are from earlier knowledge and say "per … docs" where unsure. Confirm on the tool's own docs page
-before relying on a path. Global files come from `config/tools/<tool>/` by symlink.
+before relying on a path. Global files come from `ai-dev-workspace/tools/<tool>/` by symlink.
 
 | Tool | Global rules | Project rules | Skills | MCP config |
 |---|---|---|---|---|
-| Claude Code | `~/.claude/CLAUDE.md` → "Follow ~/Code/connectedagents-ai/config/AGENTS.md" (template: `ops/mac-cleanup/templates/CLAUDE.md`) | `CLAUDE.md` = `@AGENTS.md` | `~/.claude/skills`, `.claude/skills` | `claude mcp add --scope user …`, project `.mcp.json` |
+| Claude Code | `~/.claude/CLAUDE.md` → "Follow ~/Code/connectedagents-ai/ai-dev-workspace/AGENTS.md" (template: `ops/mac-cleanup/templates/CLAUDE.md`) | `CLAUDE.md` = `@AGENTS.md` | `~/.claude/skills`, `.claude/skills` | `claude mcp add --scope user …`, project `.mcp.json` |
 | Claude Desktop | n/a (Projects instructions in the app) | n/a | uploaded skills | `~/Library/Application Support/Claude/claude_desktop_config.json` (template in `ops/mac-cleanup/templates/`) |
 | Codex CLI / IDE / cloud | `~/.codex/AGENTS.md` | `AGENTS.md` (native) | `~/.agents/skills`, `.agents/skills` | `~/.codex/config.toml` `[mcp_servers.*]`, or `codex mcp add` |
 | Cursor | Settings → Rules → User Rules: one line pointing to AGENTS.md | `AGENTS.md` (native); `.cursor/rules/*.mdc` only for Cursor-only extras | `~/.cursor/skills`, `~/.agents/skills`, `.cursor/skills` | `~/.cursor/mcp.json`, `.cursor/mcp.json` |
@@ -221,7 +221,7 @@ before relying on a path. Global files come from `config/tools/<tool>/` by symli
 | Warp | Settings → AI → Rules: pointer to AGENTS.md | reads `AGENTS.md` / `WARP.md` | n/a | Settings → AI → MCP servers |
 | Devin | Knowledge entry: "Always follow AGENTS.md in the repo root" | `AGENTS.md` | Playbooks | Devin → Settings → MCP |
 | Replit Agent | n/a | `replit.md` → one line pointing to AGENTS.md | n/a | Replit → Integrations |
-| ChatGPT / Gemini / Perplexity / Grok / Copilot chat | custom instructions: short house style + "names and tags follow the Global Ontology" | Project / Gem / Space / workspace instructions from `config/prompts/<tool>/` | phase 5 step 6 | ChatGPT connectors (developer mode), Perplexity Mac connectors, Copilot Studio |
+| ChatGPT / Gemini / Perplexity / Grok / Copilot chat | custom instructions: short house style + "names and tags follow the Global Ontology" | Project / Gem / Space / workspace instructions from `ai-dev-workspace/prompts/<tool>/` | phase 5 step 6 | ChatGPT connectors (developer mode), Perplexity Mac connectors, Copilot Studio |
 | Linear agents (Devin, Cursor, Codex, Copilot, Warp, Claude, Grok bot) | workspace-level agent guidance if your Linear plan has it (check Settings → Agents); otherwise each agent's own instructions. Text: summary of AGENTS.md §2 + "branch/PR title carries the issue key" | n/a | n/a | Linear MCP for tools that need it |
 
 Product repos get all of this from the template ([`GITHUB-SETUP.md`](GITHUB-SETUP.md) §7–§8). **Done when** each tool, asked
@@ -262,7 +262,7 @@ Product repos get all of this from the template ([`GITHUB-SETUP.md`](GITHUB-SETU
   Codex, Copilot, Warp, Claude) and remove the rest; one project per phase of this file under P-POW-52.
 - **Grok bot data in Linear and Notion:** list what it wrote before deciding its future. Linear: filter issues and comments by the bot user
   (or Linear MCP `list_issues` / `list_comments`), export to CSV. Notion: Settings → Connections → the Grok integration → pages it can
-  access; search pages it created. Keep useful instructions as `config/agents/grok-bot.md`; narrow its page access to what it needs, or remove it.
+  access; search pages it created. Keep useful instructions as `ai-dev-workspace/agents/grok-bot.md`; narrow its page access to what it needs, or remove it.
 - **Notion:** documents and wikis only (no code, no secrets). Teamspaces follow the master folder tree. Ontology wikis feed phase 4 and then
   point to the YAML.
 - **Devin / Warp / Docker:** each connects to GitHub through the org app (no personal tokens), reads `AGENTS.md`, gets secrets from 1Password.
@@ -278,17 +278,17 @@ Product repos get all of this from the template ([`GITHUB-SETUP.md`](GITHUB-SETU
 
 ### Phase 10 · Verify and keep it that way
 - [ ] `find_plaintext_keys.py` clean; push protection on; no bot shares more than `AI-Agents`
-- [ ] every account in `register/accounts.csv` exported and ingested; promoted items committed to `config`
+- [ ] every account in `register/accounts.csv` exported and ingested; promoted items committed to `ai-dev-workspace`
 - [ ] every local repo pushed or archived; old orgs archived
 - [ ] `skills_hub.py inventory`: each core skill once, no issues; `skills_hub.py link` says "nothing to do"
 - [ ] every tool in the phase 6 table points at AGENTS.md; every MCP client lists only the core set
 - [ ] three API smoke tests pass; spend limits set
 - [ ] `global-ontology.yaml` merged; naming lint report worked down
 - **Weekly (15 min):** empty `00-inbox/` and `~/Code/_scratch/`, re-run the skills inventory and the MCP park dry runs, close stale agent PRs.
-- **Changes** only by PR to `config`; the ontology gets a semver bump and changelog entry.
+- **Changes** only by PR to `ai-dev-workspace`; the ontology gets a semver bump and changelog entry.
 
 ## 4. Kickoff prompt for the hub project
-Create `config` (phase 1), clone it to `~/Code/connectedagents-ai/config`, open Claude Code **on the Mac** in that folder, and paste:
+Clone `ai-dev-workspace` (phase 1) to `~/Code/connectedagents-ai/ai-dev-workspace`, open Claude Code **on the Mac** in that folder, and paste:
 
 ```text
 You are setting up the hub repo for our unified AI workspace. Read AGENTS.md and docs/UNIFIED-AI-WORKSPACE.md first; follow
@@ -326,8 +326,8 @@ are the governance; this file and `ops/` are the execution; the Personal OS is t
 | Layer | Holds | Lives in |
 |---|---|---|
 | **Personal OS** (chief-of-staff agent) | Identity, operating principles, life areas, priority tiers 1–5, daily/weekly/decision modes | Personal content: a private Claude Project instruction + private Drive file only. Structure: skills `ops/skills/library/{morning-brief,weekly-review,decision-check}` |
-| **Chairman** (orchestrator) | Authority matrix, approval tickets, sub-agent roster, cadence, escalation | `config/agents/chairman-agent.md` (private repo). Its §11 decisions file and §2 of this file's account register are **one file** |
-| **Execution** (this file) | Waves, phases, scripts, tests | `ops/` here, then `config/ops/` |
+| **Chairman** (orchestrator) | Authority matrix, approval tickets, sub-agent roster, cadence, escalation | `chairman/CHAIRMAN.md` in `ai-dev-workspace` (private). Its §11 decisions file and §2 of this file's account register are **one file** |
+| **Execution** (this file) | Waves, phases, scripts, tests | `ops/` here, then `ai-dev-workspace` (scripts stay here in `repo-template/ops/`) |
 
 | Chairman agent | Runs | Wave / phase |
 |---|---|---|

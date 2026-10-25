@@ -3,7 +3,7 @@
 One private repo, the **agent home**, holds every agent's definition and one memory pack that every agent system and LLM reads from.
 READMEs, per-agent memory views and per-tool files are **generated** and refreshed automatically, so they never drift.
 Scripts: `ops/agents/agent_fs.py` and `ops/agents/refresh.sh` (dry run unless `--apply`). Governance: the Chairman Agent (authority matrix,
-approval tickets, receipts). This page is generic; the agent home itself is private because it holds personal memory.
+approval tickets, receipts). This page is generic; the agent home itself (`connectedagents-ai/ai-dev-workspace`) is private because it holds personal memory.
 
 ## 1. Layout
 ```
