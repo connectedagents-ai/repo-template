@@ -1,0 +1,26 @@
+# Copy to .github/workflows/ in the PRIVATE agent-home repo. Regenerates every README, memory view and tools/* file on push,
+# and commits them, so the generated files never drift from AGENT.md, memory/sources and chairman/.
+name: refresh-agent-home
+on:
+  push:
+    branches: [main]
+    paths: ["agents/**/AGENT.md", "memory/sources/**", "chairman/**", "profile/**"]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: connectedagents-ai/repo-template
+          path: .tooling
+      - run: bash .tooling/ops/agents/refresh.sh --root . --apply --no-sync
+      - run: |
+          git config user.name "agent-home-refresh"
+          git config user.email "agent-home-refresh@users.noreply.github.com"
+          git add -A -- . ':!.tooling'
+          git diff --cached --quiet || git commit -m "chore: refresh generated agent-home files"
+          git push
