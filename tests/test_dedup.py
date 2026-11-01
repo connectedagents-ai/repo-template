@@ -44,6 +44,16 @@ class DedupPipelineTest(TempDirTest):
         self.assertEqual(self.scanned(files, "--skip-repos"), {"docs/a.pdf"})
         self.assertIn("proj/src/main.py", self.scanned(files))
 
+    def test_skip_repos_skips_a_root_that_is_inside_a_repo(self):
+        repo, run = self.tmp / "repo", self.tmp / "run"
+        (repo / ".git").mkdir(parents=True)
+        (repo / "docs").mkdir()
+        (repo / "docs/tracked.pdf").write_text("x" * 20)
+        r = self.run_py(SCAN, "--surface", "s", "--root", repo / "docs", "--out", run, "--skip-repos")
+        self.assertIn("inside a git repo", r.stderr)
+        with open(run / "inventory-s.csv", newline="") as f:
+            self.assertEqual(list(csv.DictReader(f)), [])
+
     def test_apply_moves_duplicate_and_restore_script_puts_it_back(self):
         weird = "b/it's $(touch pwned) \"q\".txt"
         home, run = self.plan({"a/report.txt": "same" * 20, weird: "same" * 20})

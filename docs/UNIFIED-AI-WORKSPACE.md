@@ -172,6 +172,7 @@ GitHub topics, Drive labels, SharePoint columns, Finder tags, Notion database pr
 **Done when** `global-ontology.yaml` v1.0.0 is merged and the lint report (`lint_names.py`) lists every violation with a proposed name.
 
 ### Phase 5 · Centralize the skills
+Run these from the `repo-template` root (`cd ~/Code/connectedagents-ai/repo-template`), not from `ops/`.
 1. **Inventory:** `python3 ops/skills/skills_hub.py inventory --scan-repos ~/Code --out ~/ops-reports/skills.csv` lists every
    `SKILL.md` in Claude, `~/.agents`, Cursor, Codex, Antigravity/Gemini, Grok and every repo-level skills folder, with
    identical copies, same-name variants and front-matter problems. Add plugin skills from Claude Code's `/plugin` list and the
@@ -241,7 +242,7 @@ Product repos get all of this from the template ([`GITHUB-SETUP.md`](GITHUB-SETU
 ### Phase 8 · API environments (Claude, OpenAI, xAI)
 1. One key **per environment** (dev, ci, prod) and per provider, stored in `AI-Agents` (dev) and the CI/prod vaults. Names:
    `Anthropic-dev`, `OpenAI-ci`, `xAI-prod`, …
-2. Template: [`ops/env/ai-apis.env.example`](../ops/env/ai-apis.env.example). Run anything with
+2. Template: [`ops/env/ai-apis.env.example`](../ops/env/ai-apis.env.example). From the `repo-template` root, run anything with
    `op run --env-file=ops/env/ai-apis.env.example -- <cmd>`. CI uses a 1Password service account or GitHub OIDC, never a pasted key.
 3. Smoke test each provider (prints the model list, not the key):
    ```bash

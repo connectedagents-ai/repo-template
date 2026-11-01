@@ -35,6 +35,11 @@ def keep_dir(dirpath, d, root_dev, skip_repos):
             and not (skip_repos and os.path.lexists(os.path.join(full, ".git"))))
 
 
+def inside_git_tree(path):
+    path = path.resolve()
+    return any((p / ".git").exists() for p in [path, *path.parents])
+
+
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--surface", required=True, help="label, e.g. mac-local, gdrive-powerconnection, onedrive-onewishlabs, icloud-drive")
@@ -57,6 +62,9 @@ def main():
             root = root.expanduser()
             if not root.exists():
                 print(f"  skip missing root {root}", file=sys.stderr)
+                continue
+            if a.skip_repos and inside_git_tree(root):
+                print(f"  skip {root}: it is inside a git repo (--skip-repos)", file=sys.stderr)
                 continue
             root_dev = os.stat(root).st_dev
             for dirpath, dirnames, filenames in os.walk(root, onerror=lambda e: None):  # does not follow symlinks

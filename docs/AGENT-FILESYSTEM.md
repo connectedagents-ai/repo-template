@@ -67,7 +67,7 @@ Chat apps have no API to write memory, so the paste file is regenerated and you 
 
 ## 5. Dynamic updates (pick any; all run `refresh.sh`)
 - **Nightly on the Mac:** `ops/agents/templates/com.connectedagents.agent-home-refresh.plist` (03:00, the Chairman cadence). Edit the two paths, copy to `~/Library/LaunchAgents/`, `launchctl load` it.
-- **On push to the private repo:** `ops/agents/templates/refresh-agent-home.yml` → `.github/workflows/` there. Regenerates and commits files (no sync in CI).
+- **On push to the private repo:** `ops/agents/templates/refresh-agent-home.yml` → `.github/workflows/` there. Regenerates the files and opens or updates a pull request from `automation/agent-home-refresh` (no direct push to main, no sync in CI).
   It checks out `repo-template` for the scripts; if that repo goes private, give the workflow a read token.
 - **After each Claude Code session:** add a `SessionEnd` hook in `~/.claude/settings.json` that runs
   `bash <repo-template>/ops/agents/refresh.sh --root <agent home> --apply`. Opt-in by hand (the scripts never edit your settings).

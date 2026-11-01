@@ -1,4 +1,4 @@
-import csv, hashlib
+import base64, csv, hashlib, sys
 from tests.helpers import OPS, TempDirTest
 
 LOCATE = OPS / "dedup/locate_by_hash.py"
@@ -56,3 +56,22 @@ class LocateByHashTest(TempDirTest):
         (row,) = located.values()
         self.assertEqual(row["algo"], "md5")
         self.assertIn("located 1 of 1", r.stdout)
+
+    def test_quickxor_in_hex_and_onedrive_base64_forms_are_found(self):
+        sys.path.insert(0, str(OPS / "dedup"))
+        from quickxorhash import QuickXorHash
+        q = QuickXorHash()
+        q.update(b"memo")
+        hexform = q.hexdigest()
+        listing = self.tmp / "q.txt"
+        listing.write_text(hexform + "\n" + base64.b64encode(bytes.fromhex(hexform)).decode() + "\n")
+        r, located, _ = self.locate(listing)
+        self.assertEqual({row["algo"] for row in located.values()}, {"quickxor"})
+        self.assertIn("located 2 of 2", r.stdout)
+
+    def test_named_sha1_column_is_not_tried_as_quickxor(self):
+        listing = self.tmp / "s.csv"
+        listing.write_text(f"sha1,size\n{hashlib.sha1(b'memo').hexdigest()},4\n")
+        _, located, _ = self.locate(listing)
+        (row,) = located.values()
+        self.assertEqual(row["algo"], "sha1")

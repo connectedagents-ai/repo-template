@@ -9,7 +9,9 @@ FAKE_RCLONE = r'''#!/bin/bash
 key() { printf '%s' "$1" | tr '/: ' '___'; }
 case "$1" in
   config) [ -n "$READONLY" ] && echo "scope = drive.readonly" || echo "scope = drive" ;;
-  lsjson) f="$FAKE/$(key "${@: -1}").json"; [ -f "$f" ] && cat "$f" || echo "[]" ;;
+  lsjson) f="$FAKE/$(key "${@: -1}").json"
+          if [ -f "$f" ]; then cat "$f"; elif [ -n "$AUTH_FAIL" ]; then echo "error: token expired" >&2; exit 1
+          else echo "error listing: directory not found" >&2; exit 3; fi ;;
   copyto) src="$3"; dst="$4"; sum=$(python3 -c 'import hashlib,sys; print(hashlib.md5(open(sys.argv[1],"rb").read()).hexdigest())' "$src"); [ -n "$BAD_HASH" ] && sum=bad
           printf '[{"Path":"x","Hashes":{"md5":"%s"}}]' "$sum" > "$FAKE/$(key "$dst").json"; echo "$dst" >> "$FAKE/copies" ;;
 esac
@@ -66,9 +68,30 @@ class ConsolidateTest(TempDirTest):
         key = "gdrive-me_Master_stmts_jan.pdf"
         (self.tmp / f"fake/{key}.json").write_text(json.dumps([{"Path": "jan.pdf", "Hashes": {"md5": "other"}}]))
         r = self.consolidate("--apply")
-        self.assertIn("conflicts (left in place): 1", r.stdout)
+        self.assertIn("unverifiable existing files (left in place): 1", r.stdout)
         self.assertNotIn("gdrive-me:Master/stmts/jan.pdf", self.copies())
         self.assertTrue((self.src / "stmts/jan.pdf").exists())
+
+    def test_existing_file_without_checksum_is_never_overwritten(self):
+        key = "gdrive-me_Master_stmts_jan.pdf"
+        (self.tmp / f"fake/{key}.json").write_text(json.dumps([{"Path": "jan.pdf", "Hashes": {}}]))
+        r = self.consolidate("--apply")
+        self.assertIn("unverifiable existing files (left in place): 1", r.stdout)
+        self.assertNotIn("gdrive-me:Master/stmts/jan.pdf", self.copies())
+
+    def test_listing_failure_is_not_mistaken_for_a_new_folder(self):
+        r = self.consolidate("--apply", env={"AUTH_FAIL": "1"})
+        self.assertIn("not verified (left in place): 2", r.stdout)
+        self.assertEqual(self.copies(), [])
+
+    def test_plan_paths_match_through_symlinks(self):
+        link = self.tmp / "link"
+        link.symlink_to(self.src)
+        plan = self.tmp / "duplicates.csv"
+        plan.write_text("group,sha256,size,action,surface,path,hashes\n"
+                        f"1,x,3,archive,mac-local,{link / 'stmts/feb.pdf'},\n")
+        r = self.consolidate("--plan", plan)
+        self.assertIn("1 files", r.stdout)
 
     def test_plan_leaves_out_planned_duplicates(self):
         plan = self.tmp / "duplicates.csv"

@@ -1,4 +1,4 @@
-import json
+import json, subprocess
 from tests.helpers import OPS, TempDirTest
 
 AFS = OPS / "agents/agent_fs.py"
@@ -49,7 +49,9 @@ class AgentFsTest(TempDirTest):
         self.assertEqual(locations, ["Location: Houston"])
         self.assertIn("Austin", (self.root / "memory/CONFLICTS.md").read_text())
         self.assertNotIn("deadline", json.dumps(pack))
-        self.assertIn("Matter deadline", (self.root / "memory/BOUNDARY.md").read_text())
+        boundary = (self.root / "memory/BOUNDARY.md").read_text()
+        self.assertIn("claude/default tagged ['privileged']", boundary)
+        self.assertNotIn("deadline", boundary)
 
     def test_render_generates_banners_readmes_and_is_stable(self):
         self.built()
@@ -85,6 +87,34 @@ class AgentFsTest(TempDirTest):
         self.afs("memory", "merge", "--root", self.root, "--apply")
         (entry,) = self.pack()
         self.assertIsNone(entry["body_md"])
+        stored = "".join(p.read_text() for p in (self.root / "memory").rglob("*") if p.is_file())
+        self.assertNotIn("Trust distribution", stored)
+        self.assertIn("[family-office] item", entry["title"])
+
+    def test_privileged_tag_keeps_body_out_of_sources_but_still_dedupes(self):
+        self.afs("init", "--root", self.root, "--apply")
+        f = self.tmp / "lit.md"
+        f.write_text("- Matter deadline is Friday\n- matter deadline is friday.\n")
+        r = self.afs("memory", "import", "--root", self.root, "--platform", "claude", "--tag", "privileged", f, "--apply")
+        self.assertIn("1 new items", r.stdout)
+        src = (self.root / "memory/sources/claude/default.jsonl").read_text()
+        self.assertNotIn("deadline", src.lower())
+        self.assertIn('"body_hash"', src)
+
+    def test_restated_fact_wins_and_signed_values_stay_distinct(self):
+        self.afs("init", "--root", self.root, "--apply")
+        rows = [("Location: Austin", "2020"), ("Location: Houston", "2021"), ("Location: Austin", "2022"),
+                ("Balance: -100", "2020"), ("Balance: 100", "2020")]
+        for n, (body, year) in enumerate(rows):
+            f = self.tmp / f"m{n}.jsonl"
+            f.write_text(json.dumps({"body_md": body, "key": body.split(":")[0].lower(), "updated_at": f"{year}-01-01T00:00:00Z"}) + "\n")
+            self.afs("memory", "import", "--root", self.root, "--platform", "grok", "--account", "x", f, "--apply")
+        self.afs("memory", "merge", "--root", self.root, "--apply")
+        live = {e["key"]: e["body_md"] for e in self.pack()}
+        self.assertEqual(live["location"], "Location: Austin")
+        src = (self.root / "memory/sources/grok/x.jsonl").read_text()
+        self.assertIn("Balance: -100", src)
+        self.assertIn("Balance: 100", src)
 
     def test_sync_dry_run_then_apply_backs_up_and_keeps_user_content(self):
         self.built()
@@ -102,3 +132,28 @@ class AgentFsTest(TempDirTest):
         (restore,) = (self.home / "Archive").glob("agent-home-sync-*/restore.sh")
         self.assertIn(".codex/AGENTS.md", restore.read_text())
         self.assertIn("ok", self.afs("sync", "--root", self.root, "--apply").stdout)
+
+    def test_refresh_dry_run_previews_merged_files_without_changing_the_repo(self):
+        self.afs("init", "--root", self.root, "--apply")
+        f = self.tmp / "m.md"
+        f.write_text("- Location: Austin\n")
+        self.afs("memory", "import", "--root", self.root, "--platform", "chatgpt", f, "--apply")
+        r = subprocess.run(["bash", str(AFS.parent / "refresh.sh"), "--root", str(self.root)], capture_output=True, text=True,
+                           env={**__import__("os").environ, **self.env}, check=True)
+        self.assertIn("DRY RUN", r.stdout)
+        self.assertIn("would", r.stdout)
+        self.assertFalse((self.root / "memory/pack.jsonl").exists())
+        self.assertFalse((self.home / ".codex").exists())
+
+    def test_import_scrubs_restricted_bodies_left_by_older_versions(self):
+        self.afs("init", "--root", self.root, "--apply")
+        dest = self.root / "memory/sources/claude/default.jsonl"
+        dest.parent.mkdir(parents=True)
+        dest.write_text(json.dumps({"platform": "claude", "account": "default", "item_id": "x", "title": "Secret plan",
+                                    "body_md": "Secret plan", "updated_at": "2020-01-01T00:00:00Z", "tags": [],
+                                    "provenance_hash": "a" * 32, "namespace": "privileged", "source_url": "s"}) + "\n")
+        empty = self.tmp / "none.md"
+        empty.write_text("")
+        r = self.afs("memory", "import", "--root", self.root, "--platform", "claude", empty, "--apply")
+        self.assertIn("1 restricted bodies removed", r.stdout)
+        self.assertNotIn("Secret", dest.read_text())

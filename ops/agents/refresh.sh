@@ -18,6 +18,15 @@ while [ $# -gt 0 ]; do
   esac
 done
 [ -n "$ROOT" ] || { echo "usage: refresh.sh --root <agent home> [--apply] [--no-sync]" >&2; exit 2; }
-python3 "$HERE/agent_fs.py" memory merge --root "$ROOT" $APPLY
-python3 "$HERE/agent_fs.py" render --root "$ROOT" $APPLY
-if [ "$SYNC" = 1 ]; then python3 "$HERE/agent_fs.py" sync --root "$ROOT" $APPLY; fi
+WORK="$ROOT"
+if [ -z "$APPLY" ]; then
+  # Dry run: apply merge and render to a scratch copy, so render and sync preview the files the merge would produce.
+  WORK="$(mktemp -d)/agent-home"
+  trap 'rm -rf "$(dirname "$WORK")"' EXIT
+  mkdir -p "$WORK"
+  tar -C "$ROOT" --exclude=.git -cf - . | tar -C "$WORK" -xf -
+  echo "DRY RUN: previewing on a scratch copy ($WORK); $ROOT is not changed"
+fi
+python3 "$HERE/agent_fs.py" memory merge --root "$WORK" --apply
+python3 "$HERE/agent_fs.py" render --root "$WORK" --apply
+if [ "$SYNC" = 1 ]; then python3 "$HERE/agent_fs.py" sync --root "$WORK" $APPLY; fi

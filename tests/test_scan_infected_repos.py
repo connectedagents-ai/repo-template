@@ -8,10 +8,13 @@ GOOD = "cnVuOiBtYWtlIHRlc3QK"                          # base64 of: run: make te
 # Fake gh. HTTP errors print the API's JSON to stdout and exit 1, as the real gh does.
 FAKE_GH = r'''#!/bin/bash
 case "$*" in
-  "repo list acme"*) printf 'hit\nold\nclean\nempty\nlocked\n' ;;
+  "repo list acme"*) printf 'hit\nold\nclean\nempty\nlocked\nwfdenied\n' ;;
+  "repo list ghost"*) echo "HTTP 401: Bad credentials" >&2; exit 1 ;;
   *"repos/acme/empty/branches"*) echo '{"message":"Git Repository is empty.","status":"409"}'; exit 1 ;;
   *"repos/acme/locked/branches"*) echo '{"message":"Forbidden","status":"403"}'; exit 1 ;;
-  *"repos/acme/hit/branches"*) printf 'main\nmega-1\n' ;;
+  *"--paginate repos/acme/hit/branches"*) printf 'main\nmega-1\n' ;;
+  *"repos/acme/hit/branches"*) echo main ;;
+  *"repos/acme/wfdenied/contents/.github/workflows?ref=main -q"*) echo '{"message":"API rate limit exceeded","status":"403"}'; exit 1 ;;
   *"branches"*) echo main ;;
   *"repos/acme/old/commits"*) echo 2 ;;
   *"commits"*) echo 0 ;;
@@ -33,7 +36,7 @@ class ScanInfectedReposTest(TempDirTest):
         gh.chmod(gh.stat().st_mode | stat.S_IEXEC)
         out = self.tmp / "scan.txt"
         env = {**os.environ, "PATH": f"{b}:/usr/bin:/bin", "OUT": str(out), "BAD": BAD, "GOOD": GOOD}
-        subprocess.run(["bash", str(SCAN), "acme"], capture_output=True, text=True, env=env, check=True)
+        subprocess.run(["bash", str(SCAN), "acme", "ghost"], capture_output=True, text=True, env=env, check=True)
         return out.read_text()
 
     def test_flags_bad_workflows_on_any_branch_and_build_bot_commits(self):
@@ -48,4 +51,6 @@ class ScanInfectedReposTest(TempDirTest):
         self.assertNotIn("acme/empty", text)
         self.assertIn("UNREACHABLE  acme/locked", text)
         self.assertNotIn("INFECTED  acme/locked", text)
-        self.assertIn("scan finished: 2 infected branch(es), 1 unreachable", text)
+        self.assertIn("UNREACHABLE  acme/wfdenied@main  (check failed: workflow list)", text)
+        self.assertIn("UNREACHABLE  ghost  (could not list repos", text)
+        self.assertIn("scan finished: 2 infected branch(es), 3 unreachable", text)

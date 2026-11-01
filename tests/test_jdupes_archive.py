@@ -42,3 +42,11 @@ class JdupesArchiveTest(TempDirTest):
         self.assertTrue((self.ssd / "Mullins case/l.pdf").exists())
         subprocess.run(["bash", str(self.archive / "restore.sh")], check=True)
         self.assertEqual((self.ssd / "B/deep/x.pdf").read_bytes(), b"hello")
+
+    def test_files_gone_since_the_report_are_left_out_not_fatal(self):
+        (self.ssd / "B/x copy.pdf").unlink()
+        r, plan = self.run_tool()
+        self.assertEqual(plan["A/x.pdf"], "keep")
+        self.assertEqual(plan["B/deep/x.pdf"], "archive")
+        self.assertNotIn("B/x copy.pdf", plan)
+        self.assertIn("1 files in the report no longer exist", r.stderr)

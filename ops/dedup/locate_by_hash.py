@@ -5,14 +5,15 @@
     python3 locate_by_hash.py --hashes hashes.txt --root ~/Desktop --algo md5 --out <dir>
 
 --hashes: a CSV with a hash column (named hash, sha256, sha1, md5 or quickxor) and optional size, name and old_path columns,
-or a plain text file with one hash per line. The hash type is detected from its form (64 hex = sha256, 40 = sha1, 32 = md5,
-28-char base64 = quickxor) unless --algo is given.
+or a plain text file with one hash per line. The hash type comes from --algo, else from the column name (sha256, sha1,
+md5, quickxor), else from its form: 64 hex = sha256, 32 hex = md5, 28-char base64 = quickxor (as the OneDrive API gives it),
+and 40 hex = sha1 OR quickxor (as rclone and quickxorhash.py print it): both are tried.
 Speed: when sizes are known, only files of a wanted size are hashed; files whose name matches a wanted name are hashed too.
 Without sizes every file under the roots is hashed (slow on big trees: give sizes when you have them).
 Writes <out>/located.csv (hash, old_path, current_path, copies, all_paths) and <out>/missing.csv, and prints the hit rate.
 Never moves, renames or opens anything for writing. Skips build/dependency folders and iCloud placeholders (no downloads).
 """
-import argparse, csv, os, re, stat, sys
+import argparse, base64, csv, os, re, stat, sys
 from collections import defaultdict
 from pathlib import Path
 
@@ -21,22 +22,27 @@ from dedup_merge import file_hashes  # noqa: E402
 from dedup_scan import SF_DATALESS, SKIP_DIRS, SKIP_SUFFIXES  # noqa: E402
 
 HASH_COLS = ("hash", "sha256", "sha1", "md5", "quickxor", "fingerprint")
+ALGOS = ("sha256", "sha1", "md5", "quickxor")
 
 
 def detect(h):
-    if re.fullmatch(r"[0-9a-f]{64}", h):
-        return "sha256"
-    if re.fullmatch(r"[0-9a-f]{40}", h):
-        return "sha1"
-    if re.fullmatch(r"[0-9a-f]{32}", h):
-        return "md5"
+    """Candidate algorithms for a fingerprint, from its form."""
+    if re.fullmatch(r"[0-9a-fA-F]{64}", h):
+        return ["sha256"]
+    if re.fullmatch(r"[0-9a-fA-F]{40}", h):
+        return ["sha1", "quickxor"]
+    if re.fullmatch(r"[0-9a-fA-F]{32}", h):
+        return ["md5"]
     if re.fullmatch(r"[A-Za-z0-9+/]{27}=", h):
-        return "quickxor"
-    return None
+        return ["quickxor"]
+    return []
 
 
-def norm(h, algo):
-    return h if algo == "quickxor" else h.lower()
+def norm(h):
+    """Every fingerprint as lowercase hex; base64 QuickXor (OneDrive API form) is decoded."""
+    if re.fullmatch(r"[A-Za-z0-9+/]{27}=", h):
+        return base64.b64decode(h).hex()
+    return h.lower()
 
 
 def load(path, forced):
@@ -49,18 +55,18 @@ def load(path, forced):
         col = next(c for c in reader.fieldnames if c.strip().lower() in HASH_COLS)
         for r in reader:
             low = {k.strip().lower(): (v or "").strip() for k, v in r.items() if k}
-            rows.append({"hash": low.get(col.strip().lower(), ""), "size": low.get("size", ""),
+            rows.append({"hash": low.get(col.strip().lower(), ""), "col": col.strip().lower(), "size": low.get("size", ""),
                          "name": low.get("name", "") or os.path.basename(low.get("old_path", "") or low.get("path", "")),
                          "old_path": low.get("old_path", "") or low.get("path", "")})
     else:
         rows = [{"hash": ln.strip(), "size": "", "name": "", "old_path": ""} for ln in text.splitlines() if ln.strip()]
     out = []
     for r in rows:
-        algo = forced or detect(r["hash"].lower()) or detect(r["hash"])
-        if not r["hash"] or not algo:
+        algos = [forced] if forced else ([r["col"]] if r.get("col") in ALGOS else detect(r["hash"]))
+        if not r["hash"] or not algos:
             print(f"  skip unrecognized hash: {r['hash'][:20]!r}", file=sys.stderr)
             continue
-        r["algo"], r["hash"] = algo, norm(r["hash"], algo)
+        r["algos"], r["hash"] = algos, norm(r["hash"])
         r["size"] = int(r["size"]) if str(r["size"]).isdigit() else None
         out.append(r)
     return out
@@ -96,8 +102,8 @@ def main():
     wanted = load(a.hashes, a.algo)
     if not wanted:
         sys.exit("no usable hashes in the list")
-    algos = tuple(sorted({w["algo"] for w in wanted}))
-    by_hash = {(w["algo"], w["hash"]): w for w in wanted}
+    algos = tuple(sorted({x for w in wanted for x in w["algos"]}))
+    by_hash = {(x, w["hash"]): w for w in wanted for x in w["algos"]}
     sizes = {w["size"] for w in wanted if w["size"] is not None}
     every_size_known = all(w["size"] is not None for w in wanted)
     names = {w["name"] for w in wanted if w["name"]}
@@ -111,9 +117,8 @@ def main():
         digests = file_hashes(p, algos)
         hashed += 1
         for algo, value in digests.items():
-            key = (algo, norm(value, algo))
-            if key in by_hash:
-                found[key].append(p)
+            if (algo, value.lower()) in by_hash:
+                found[(algo, value.lower())].append(p)
     a.out.mkdir(parents=True, exist_ok=True)
     hits = 0
     with open(a.out / "located.csv", "w", newline="") as f, open(a.out / "missing.csv", "w", newline="") as m:
@@ -121,7 +126,9 @@ def main():
         lw.writerow(["hash", "algo", "old_path", "current_path", "copies", "all_paths"])
         mw.writerow(["hash", "algo", "old_path", "name", "size"])
         for w in wanted:
-            paths = sorted(found.get((w["algo"], w["hash"]), []))
+            matched = [x for x in w["algos"] if found.get((x, w["hash"]))]
+            w["algo"] = matched[0] if matched else "/".join(w["algos"])
+            paths = sorted({p for x in matched for p in found[(x, w["hash"])]})
             if paths:
                 hits += 1
                 same = [p for p in paths if w["old_path"] and os.path.abspath(os.path.expanduser(w["old_path"])) == p]

@@ -1,4 +1,4 @@
-import csv
+import csv, subprocess
 from tests.helpers import OPS, TempDirTest
 
 HUB = OPS / "skills/skills_hub.py"
@@ -29,7 +29,7 @@ class SkillsHubTest(TempDirTest):
         self.assertEqual(rows[("review", "codex")]["duplicate"], "variant: merge")
         self.assertIn("no description", rows[("Bad_Name", "grok")]["issues"])
         self.assertIn("not kebab-case", rows[("Bad_Name", "grok")]["issues"])
-        self.assertIn("5 skills, 3 distinct names, 2 names with more than one copy", r.stdout)
+        self.assertIn("5 skills (0 more locations are links), 3 distinct names, 2 names with more than one copy", r.stdout)
 
     def test_inventory_scans_repo_level_skill_folders(self):
         skill(self.tmp / "code/app/.claude/skills/ship", "ship")
@@ -56,3 +56,30 @@ class SkillsHubTest(TempDirTest):
         self.assertTrue((archive / "restore.sh").exists())
         again = self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", env=self.env)
         self.assertIn("nothing to do", again.stdout)
+
+    def test_hub_that_is_also_a_target_is_left_alone(self):
+        skill(self.home / ".agents/skills/deploy", "deploy", body="canonical")
+        r = self.run_py(HUB, "link", "--hub", self.home / ".agents/skills", "--target", ".agents/skills",
+                        "--target", ".claude/skills", "--apply", env=self.env)
+        self.assertIn("it is the hub itself", r.stdout)
+        self.assertFalse((self.home / ".agents/skills/deploy").is_symlink())
+        self.assertIn("canonical", (self.home / ".claude/skills/deploy/SKILL.md").read_text())
+        self.assertFalse((self.home / "Archive").exists())
+
+    def test_inventory_lists_every_linked_location_without_counting_copies(self):
+        skill(self.tmp / "hub/deploy", "deploy")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", "--target", ".codex/skills",
+                    "--apply", env=self.env)
+        r = self.run_py(HUB, "inventory", env=self.env)
+        self.assertIn("link to", r.stdout)
+        self.assertIn("1 skills (1 more locations are links)", r.stdout)
+
+    def test_restore_script_quotes_shell_characters(self):
+        name = "x$(touch pwned)"
+        skill(self.tmp / "hub" / name, "x")
+        skill(self.home / ".claude/skills" / name, "x", body="old")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", "--apply", env=self.env)
+        (restore,) = (self.home / "Archive").glob("skills-replaced-*/restore.sh")
+        subprocess.run(["bash", str(restore)], cwd=self.tmp, check=True)
+        self.assertFalse((self.tmp / "pwned").exists())
+        self.assertIn("old", (self.home / ".claude/skills" / name / "SKILL.md").read_text())

@@ -34,10 +34,13 @@ def skipped(path, root):
 
 
 def plan(report, root, legal):
-    rows = []
+    """Returns (rows, gone): files moved or deleted since the report are left out and counted, never fatal."""
+    rows, gone = [], 0
     for n, s in enumerate(report.get("matchSets", []), 1):
         paths = [os.path.abspath(f["filePath"]) for f in s["fileList"]]
-        paths = [p for p in paths if not skipped(p, root)]
+        present = [p for p in paths if os.path.isfile(p)]
+        gone += len(paths) - len(present)
+        paths = [p for p in present if not skipped(p, root)]
         if len(paths) < 2:
             continue
         if any(legal.search(p) for p in paths):
@@ -46,7 +49,7 @@ def plan(report, root, legal):
         keeper = min(paths, key=lambda p: (len(p), os.stat(p).st_mtime, p))
         rows.append((n, "keep", s["fileSize"], keeper, ""))
         rows += [(n, "archive", s["fileSize"], p, keeper) for p in sorted(paths) if p != keeper]
-    return rows
+    return rows, gone
 
 
 def apply(rows, root, archive):
@@ -85,7 +88,9 @@ def main():
     ap.add_argument("--apply", action="store_true")
     a = ap.parse_args()
     root = os.path.abspath(a.root)
-    rows = plan(json.loads(a.json.read_text()), root, re.compile(a.legal_pattern, re.I))
+    rows, gone = plan(json.loads(a.json.read_text()), root, re.compile(a.legal_pattern, re.I))
+    if gone:
+        print(f"  {gone} files in the report no longer exist (moved or deleted since the scan); left out", file=sys.stderr)
     a.out.mkdir(parents=True, exist_ok=True)
     with open(a.out / "plan.csv", "w", newline="") as f:
         w = csv.writer(f)

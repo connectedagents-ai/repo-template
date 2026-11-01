@@ -6,7 +6,8 @@
     python3 consolidate_to_drive.py ... --plan <run>/duplicates.csv --apply                         # after approval
 
 Each file goes to <dest>/<path relative to --root>. Safety:
-- DRY RUN by default. Never deletes and never overwrites: a destination file with different content is reported as a conflict.
+- DRY RUN by default. Never deletes and never overwrites: a destination file with different content, or one
+  whose checksum can't be read, is reported as a conflict. A destination that doesn't exist yet (new folder) is created.
 - Per file: `rclone copyto --checksum`, then the destination is re-listed and its checksum must equal the local file's.
   Only then is the local original moved (not deleted) into <archive-root>/<stamp>/<rel>. Unverified files stay where they are.
 - --plan <duplicates.csv> (from dedup_merge.py) leaves out every row planned as `archive`, so only one copy of each duplicate goes up.
@@ -28,13 +29,21 @@ def rclone(*args):
     return subprocess.run(["rclone", *args], capture_output=True, text=True)
 
 
-def remote_hashes(path):
-    """Checksums of an existing remote file, {} if it doesn't exist, None if listing failed."""
+NOT_FOUND = (3, 4)  # rclone exit codes: 3 directory not found, 4 file not found
+
+
+def remote_state(path):
+    """("missing", None) if no file is there yet (new folders included), ("exists", {checksums, maybe empty}) if one is,
+    ("error", None) for any other listing failure (auth, network, quota)."""
     r = rclone("lsjson", "--hash", "--files-only", path)
+    if r.returncode in NOT_FOUND or (r.returncode != 0 and "not found" in r.stderr.lower()):
+        return "missing", None
     if r.returncode != 0:
-        return None
+        return "error", None
     items = json.loads(r.stdout or "[]")
-    return {t: v for t, v in (items[0].get("Hashes") or {}).items() if v} if items else {}
+    if not items:
+        return "missing", None
+    return "exists", {t: v for t, v in (items[0].get("Hashes") or {}).items() if v}
 
 
 def same_content(local, remote):
@@ -54,7 +63,7 @@ def sources(root, exts, skip):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not os.path.lexists(os.path.join(dirpath, d, ".git"))]
         for name in sorted(filenames):
             p = Path(dirpath) / name
-            if name == ".DS_Store" or (exts and extension(name) not in exts) or str(p) in skip or not p.is_file():
+            if name == ".DS_Store" or (exts and extension(name) not in exts) or os.path.realpath(p) in skip or not p.is_file():
                 continue
             yield p
 
@@ -80,7 +89,7 @@ def main():
     skip = set()
     if a.plan:
         with open(a.plan, newline="", encoding="utf-8") as f:
-            skip = {r["path"] for r in csv.DictReader(f) if r["action"] == "archive"}
+            skip = {os.path.realpath(os.path.expanduser(r["path"])) for r in csv.DictReader(f) if r["action"] == "archive"}
     exts = {e.lower().lstrip(".") for e in a.ext}
     files = list(sources(root, exts, skip))
     print(f"{len(files)} files under {root} -> {dest}" + (f" ({len(skip)} planned duplicates left out)" if skip else ""))
@@ -101,15 +110,16 @@ def main():
         for p in files:
             rel = p.relative_to(root).as_posix()
             target = f"{dest}/{rel}"
-            before = remote_hashes(target)
-            if before is None:
+            state, before = remote_state(target)
+            if state == "error":
                 status = "list-failed"
-            elif before and not same_content(p, before):
-                status = "conflict"
-            elif not before and rclone("copyto", "--checksum", str(p), target).returncode != 0:
+            elif state == "exists" and not same_content(p, before):
+                status = "conflict"  # different, or no checksum to prove it's the same: never overwrite
+            elif state == "missing" and rclone("copyto", "--checksum", str(p), target).returncode != 0:
                 status = "copy-failed"
             else:
-                status = "verified" if same_content(p, remote_hashes(target)) else "unverified"
+                after_state, after = remote_state(target)
+                status = "verified" if after_state == "exists" and same_content(p, after) else "unverified"
             archived = ""
             if status == "verified":
                 archived = run / "files" / rel
@@ -126,7 +136,7 @@ def main():
             rs.flush()
             print(f"  {status:<12} {rel}")
     os.chmod(run / "restore.sh", 0o755)
-    print(f"verified + archived locally: {moved}; conflicts (left in place): {conflicts}; not verified (left in place): {failed}")
+    print(f"verified + archived locally: {moved}; conflicts or unverifiable existing files (left in place): {conflicts}; not verified (left in place): {failed}")
     print(f"Manifest: {run / 'MANIFEST.tsv'}   Undo: bash {shlex.quote(str(run / 'restore.sh'))}")
 
 

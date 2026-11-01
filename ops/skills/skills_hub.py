@@ -14,7 +14,7 @@ link: symlinks each skill folder in --hub into every --target (default ~/.claude
 ~/.gemini/antigravity/skills). Anything already at a target path that is not the right symlink is moved, never deleted, to
 ~/Archive/skills-replaced-<stamp>/, with a manifest.tsv and restore.sh. Without --apply nothing changes.
 """
-import argparse, csv, datetime, hashlib, re, shutil, sys
+import argparse, csv, datetime, hashlib, os, re, shlex, shutil, sys
 from pathlib import Path
 
 USER_ROOTS = {  # tool label -> skills folder relative to $HOME
@@ -93,23 +93,26 @@ def inventory(a):
     roots += [("extra", Path(r).expanduser()) for r in a.root]
     if a.scan_repos:
         roots += list(repo_roots(a.scan_repos))
-    rows, seen = [], set()
+    rows, first_at = [], {}
     for tool, root in roots:
         for skill in find_skills(root):
             real = skill.resolve()
-            if real in seen:  # same file reached through a symlink: already counted
-                continue
-            seen.add(real)
             text = skill.read_text(errors="replace")
             fm = front_matter(text)
             rows.append({"name": fm.get("name") or skill.parent.name, "tool": tool, "path": str(skill.parent),
                          "sha": hashlib.sha256(text.strip().encode()).hexdigest()[:12],
-                         "issues": "; ".join(issues_for(skill, fm)), "description": fm.get("description", "")[:120]})
+                         "issues": "; ".join(issues_for(skill, fm)), "description": fm.get("description", "")[:120],
+                         "linked_to": first_at.get(real, "")})
+            first_at.setdefault(real, str(skill.parent))
+    copies = [r for r in rows if not r["linked_to"]]  # a link to an already-listed file is not another copy
     by_name, by_sha = {}, {}
-    for r in rows:
+    for r in copies:
         by_name.setdefault(r["name"], []).append(r)
         by_sha.setdefault(r["sha"], []).append(r)
     for r in rows:
+        if r["linked_to"]:
+            r["duplicate"] = f"link to {r['linked_to']}"
+            continue
         same_name, same_sha = by_name[r["name"]], by_sha[r["sha"]]
         if len(same_sha) > 1:
             r["duplicate"] = "identical copy" if same_sha[0] is not r else "identical (first seen)"
@@ -118,7 +121,7 @@ def inventory(a):
         else:
             r["duplicate"] = ""
     rows.sort(key=lambda r: (r["name"], r["tool"]))
-    cols = ["name", "tool", "duplicate", "issues", "sha", "path", "description"]
+    cols = ["name", "tool", "duplicate", "issues", "sha", "path", "description", "linked_to"]
     if a.out:
         out = Path(a.out).expanduser()
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -130,8 +133,8 @@ def inventory(a):
     for r in rows:
         print(f"{r['name']:<40} {r['tool']:<12} {r['duplicate'] or '-':<22} {r['issues'] or 'ok'}")
     dups = sum(1 for v in by_name.values() if len(v) > 1)
-    print(f"\n{len(rows)} skills, {len(by_name)} distinct names, {dups} names with more than one copy, "
-          f"{sum(1 for r in rows if r['issues'])} with front-matter issues")
+    print(f"\n{len(copies)} skills ({len(rows) - len(copies)} more locations are links), {len(by_name)} distinct names, "
+          f"{dups} names with more than one copy, {sum(1 for r in copies if r['issues'])} with front-matter issues")
 
 
 def link(a):
@@ -145,9 +148,12 @@ def link(a):
     archive = home / "Archive" / f"skills-replaced-{stamp}"
     moves, links = [], []
     for target in targets:
+        if os.path.realpath(target) == str(hub):
+            print(f"skip {target}: it is the hub itself")
+            continue
         for skill in skills:
             dest = target / skill.name
-            if dest.is_symlink() and dest.resolve() == skill:
+            if os.path.realpath(dest) == str(skill):  # already the hub copy (a link to it, or the hub folder itself)
                 continue
             if dest.exists() or dest.is_symlink():
                 moves.append((dest, archive / target.relative_to(home).as_posix().replace("/", "_") / skill.name))
@@ -170,7 +176,7 @@ def link(a):
                 dst.parent.mkdir(parents=True, exist_ok=True)
                 shutil.move(str(src), str(dst))
                 man.write(f"{src}\t{dst}\n")
-                rs.write(f'rm -f "{src}"; mv "{dst}" "{src}"\n')
+                rs.write(f"rm -f {shlex.quote(str(src))}; mv {shlex.quote(str(dst))} {shlex.quote(str(src))}\n")
     for dest, skill in links:
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.symlink_to(skill, target_is_directory=True)
