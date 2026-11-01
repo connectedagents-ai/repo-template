@@ -104,3 +104,13 @@ class SkillsHubTest(TempDirTest):
         subprocess.run(["bash", str(restore)], check=True)
         self.assertIn("one", (self.home / "a/b/deploy/SKILL.md").read_text())
         self.assertIn("two", (self.home / "a_b/deploy/SKILL.md").read_text())
+
+    def test_a_target_given_twice_is_archived_once_and_restores(self):
+        skill(self.tmp / "hub/deploy", "deploy", body="canonical")
+        skill(self.home / ".claude/skills/deploy", "deploy", body="original")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", "--target", ".claude/skills",
+                    "--apply", env=self.env)
+        (restore,) = (self.home / "Archive").glob("skills-replaced-*/restore.sh")
+        self.assertEqual(restore.read_text().count("mv "), 1)
+        subprocess.run(["bash", str(restore)], check=True)
+        self.assertIn("original", (self.home / ".claude/skills/deploy/SKILL.md").read_text())

@@ -1,4 +1,4 @@
-import json, subprocess
+import json, shutil, subprocess
 from tests.helpers import OPS, TempDirTest
 
 AFS = OPS / "agents/agent_fs.py"
@@ -202,8 +202,11 @@ class AgentFsTest(TempDirTest):
     def test_sync_preview_from_a_copy_compares_against_the_real_home(self):
         self.built()
         self.afs("sync", "--root", self.root, "--apply")
-        r = self.afs("sync", "--root", self.root, "--source-root", self.root)
-        self.assertIn("ok     claude", r.stdout)
+        copy = self.tmp / "scratch-copy"
+        shutil.copytree(self.root, copy)
+        r = self.afs("sync", "--root", self.root, "--source-root", copy)
+        self.assertIn("ok     claude", r.stdout)  # compared against the real home, not the copy's path
+        self.assertNotIn(str(copy), r.stdout)
 
     def test_keyed_conflict_between_pointers_keeps_the_newest(self):
         self.afs("init", "--root", self.root, "--apply")

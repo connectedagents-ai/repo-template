@@ -149,7 +149,11 @@ def link(a):
     if not skills:
         sys.exit(f"no <name>/SKILL.md folders in {hub}")
     home = Path.home()
-    targets = [home / t for t in (a.target or DEFAULT_TARGETS)]
+    targets, seen = [], set()
+    for t in (a.target or DEFAULT_TARGETS):  # a target given twice is planned once, so no archive path is used twice
+        if os.path.realpath(home / t) not in seen:
+            seen.add(os.path.realpath(home / t))
+            targets.append(home / t)
     stamp = datetime.datetime.now().strftime("%Y%m%d-%H%M%S")
     archive = home / "Archive" / f"skills-replaced-{stamp}"
     moves, links = [], []
@@ -164,6 +168,8 @@ def link(a):
             if dest.exists() or dest.is_symlink():
                 moves.append((dest, archive / target.relative_to(home) / skill.name))  # keeps each target's own path
             links.append((dest, skill))
+    if len({dst for _, dst in moves}) != len(moves):
+        sys.exit("refusing: two entries would be archived to the same place; nothing was moved")
     for src, dst in moves:
         print(f"{'ARCHIVE' if a.apply else 'would archive'} {src} -> {dst}")
     for dest, skill in links:
