@@ -93,17 +93,23 @@ def inventory(a):
     roots += [("extra", Path(r).expanduser()) for r in a.root]
     if a.scan_repos:
         roots += list(repo_roots(a.scan_repos))
-    rows, first_at = [], {}
+    rows = []
     for tool, root in roots:
         for skill in find_skills(root):
-            real = skill.resolve()
             text = skill.read_text(errors="replace")
             fm = front_matter(text)
             rows.append({"name": fm.get("name") or skill.parent.name, "tool": tool, "path": str(skill.parent),
                          "sha": hashlib.sha256(text.strip().encode()).hexdigest()[:12],
                          "issues": "; ".join(issues_for(skill, fm)), "description": fm.get("description", "")[:120],
-                         "linked_to": first_at.get(real, "")})
-            first_at.setdefault(real, str(skill.parent))
+                         "real": skill.resolve(), "physical": not skill.parent.is_symlink(), "linked_to": ""})
+    canonical = {}  # per real file: the physical folder if scanned, else the first location seen
+    for r in rows:
+        cur = canonical.get(r["real"])
+        if cur is None or (r["physical"] and not cur["physical"]):
+            canonical[r["real"]] = r
+    for r in rows:
+        if canonical[r["real"]] is not r:
+            r["linked_to"] = canonical[r["real"]]["path"]
     copies = [r for r in rows if not r["linked_to"]]  # a link to an already-listed file is not another copy
     by_name, by_sha = {}, {}
     for r in copies:
@@ -126,7 +132,7 @@ def inventory(a):
         out = Path(a.out).expanduser()
         out.parent.mkdir(parents=True, exist_ok=True)
         with out.open("w", newline="") as f:
-            w = csv.DictWriter(f, fieldnames=cols)
+            w = csv.DictWriter(f, fieldnames=cols, extrasaction="ignore")
             w.writeheader()
             w.writerows(rows)
         print(f"wrote {out}")
@@ -156,7 +162,7 @@ def link(a):
             if os.path.realpath(dest) == str(skill):  # already the hub copy (a link to it, or the hub folder itself)
                 continue
             if dest.exists() or dest.is_symlink():
-                moves.append((dest, archive / target.relative_to(home).as_posix().replace("/", "_") / skill.name))
+                moves.append((dest, archive / target.relative_to(home) / skill.name))  # keeps each target's own path
             links.append((dest, skill))
     for src, dst in moves:
         print(f"{'ARCHIVE' if a.apply else 'would archive'} {src} -> {dst}")

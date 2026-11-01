@@ -50,3 +50,13 @@ class JdupesArchiveTest(TempDirTest):
         self.assertEqual(plan["B/deep/x.pdf"], "archive")
         self.assertNotIn("B/x copy.pdf", plan)
         self.assertIn("1 files in the report no longer exist", r.stderr)
+
+    def test_legal_hold_survives_when_the_legal_copy_is_gone(self):
+        (self.ssd / "Mullins case/l.pdf").unlink()
+        (self.ssd / "C").mkdir()
+        (self.ssd / "C/l.pdf").write_bytes(b"legal")
+        report = json.loads(self.report.read_text())
+        report["matchSets"][1]["fileList"].append({"filePath": str(self.ssd / "C/l.pdf")})
+        self.report.write_text(json.dumps(report))
+        _, plan = self.run_tool()
+        self.assertEqual({plan["A/l.pdf"], plan["C/l.pdf"]}, {"flag-legal"})

@@ -175,6 +175,9 @@ def parse_items(path):
             if ln.strip():
                 r = json.loads(ln)
                 body = r.get("body_md") or r.get("text") or r.get("content") or ""
+                if not body.strip() and r.get("body_hash"):  # a pointer exported from another agent home
+                    yield None, r.get("key"), r
+                    continue
                 yield body.strip(), r.get("key"), r
         return
     for ln in text.splitlines():
@@ -208,34 +211,47 @@ def cmd_import(a):
         to_pointer(i)
     index = {i["provenance_hash"]: i for i in existing}
     files = [p for x in a.inputs for p in ([x] if x.is_file() else sorted(x.rglob("*"))) if p.is_file()]
-    new, restated = [], 0
+    new, restated, reclassified = [], 0, 0
     for f in files:
         stamp = datetime.datetime.fromtimestamp(f.stat().st_mtime, datetime.timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
         item_type = "instruction" if re.search(r"instruction|agents\.md|claude\.md|gemini\.md|rules", f.name, re.I) else "memory"
         for body, key, r in parse_items(f):
-            if not body:
+            pointer = body is None
+            if not pointer and not body:
                 continue
-            prov = h(f"{a.platform}|{a.account}|{norm(body)}", 32)
+            ident = r["body_hash"] if pointer else norm(body)
+            prov = h(f"{a.platform}|{a.account}|{ident}", 32)
             updated = r.get("updated_at", stamp)
-            if prov in index:
-                if updated > index[prov]["updated_at"]:  # the same fact said again later is current again
-                    index[prov]["updated_at"] = updated
-                    restated += 1
-                continue
             tags = sorted(set(r.get("tags") or []) | set(a.tag))
             ns = r.get("namespace", a.namespace)
+            if prov in index:
+                old = index[prov]
+                if updated > old["updated_at"]:  # the same fact said again later is current again
+                    old["updated_at"] = updated
+                    restated += 1
+                if restricted(ns, tags) and not restricted(old.get("namespace"), old.get("tags") or []):
+                    old.update(tags=sorted(set(old.get("tags") or []) | set(tags)), namespace=ns)  # newly restricted
+                    if old.get("body_md"):
+                        to_pointer(old)
+                    reclassified += 1
+                continue
             item = {"platform": a.platform, "account": a.account, "item_type": r.get("item_type", item_type),
-                    "item_id": h(prov), "title": body[:80], "body_md": body,
+                    "item_id": h(prov), "title": "" if pointer else body[:80], "body_md": None if pointer else body,
                     "created_at": r.get("created_at", stamp), "updated_at": updated,
                     "tags": tags, "project": r.get("project", a.project), "source_url": r.get("source_url", str(f)),
                     "provenance_hash": prov, "namespace": ns, "key": key}
-            if restricted(ns, tags):
+            if pointer:
+                if not restricted(ns, tags):
+                    print(f"  skip pointer without a restricted namespace or tag: {r['body_hash'][:8]}", file=sys.stderr)
+                    continue
+                item.update(body_hash=r["body_hash"], title=r.get("title") or f"[{ns}] item {prov[:8]}")
+            elif restricted(ns, tags):
                 to_pointer(item, r.get("title"))
             index[prov] = item
             new.append(item)
-    print(f"{len(new)} new items, {restated} restated with a newer date, {len(scrubbed)} restricted bodies removed, "
-          f"from {len(files)} files -> {dest} ({len(existing)} already there)")
-    if new or restated or scrubbed:
+    print(f"{len(new)} new items, {restated} restated with a newer date, {reclassified} reclassified as restricted, "
+          f"{len(scrubbed)} restricted bodies removed, from {len(files)} files -> {dest} ({len(existing)} already there)")
+    if new or restated or reclassified or scrubbed:
         write(dest, jsonl(existing + new), a.apply)
 
 
@@ -263,7 +279,7 @@ def cmd_merge(a):
             entry.update(title=i["title"], body_md=i["body_md"])
         if i.get("key"):
             prev = by_key.get((ns, i["key"]))
-            if prev and prev != fid and pack[prev]["body_md"] != entry["body_md"]:
+            if prev and prev != fid:  # different identity = different fact (pointers included)
                 conflicts.append((ns, i["key"], pack[prev], entry))
                 pack[prev]["superseded_by"] = fid
             by_key[(ns, i["key"])] = fid
@@ -272,7 +288,8 @@ def cmd_merge(a):
     mem = a.root / "memory"
     write(mem / "pack.jsonl", jsonl(live), a.apply)
     lines = [BANNER, "# Memory conflicts (newest wins; review these)", ""]
-    lines += [f"- **{ns} / {k}**: kept \"{new['body_md']}\" ({new['updated_at']}) over \"{old['body_md']}\" ({old['updated_at']})"
+    lines += [f"- **{ns} / {k}**: kept \"{new['body_md'] or new['title']}\" ({new['updated_at']}) over "
+              f"\"{old['body_md'] or old['title']}\" ({old['updated_at']})"
               for ns, k, old, new in conflicts] or ["None."]
     write(mem / "CONFLICTS.md", "\n".join(lines) + "\n", a.apply)
     lines = [BANNER, "# Boundary report: items refused from general namespaces", ""]
@@ -379,8 +396,9 @@ def cmd_sync(a):
     backup = home / "Archive" / f"agent-home-sync-{stamp}"
     restore = []
     for tool, (fname, _, target) in TOOLS.items():
-        src = a.root / "tools" / tool / fname
-        if not src.exists():
+        src = a.root / "tools" / tool / fname  # where the file lives (and what the Claude import points at)
+        read = (a.source_root or a.root) / "tools" / tool / fname  # what to install: a dry-run preview copy, if given
+        if not read.exists():
             print(f"skip {tool}: run render first")
             continue
         if target is None:
@@ -388,7 +406,7 @@ def cmd_sync(a):
             continue
         dest = home / target
         existing = dest.read_text() if dest.exists() else ""
-        block = str(src.resolve()) if tool == "claude" else src.read_text().strip()
+        block = str(src.resolve()) if tool == "claude" else read.read_text().strip()
         new = managed(existing, block, target)
         if new == existing:
             print(f"ok     {tool:<12} {dest}")
@@ -438,7 +456,9 @@ def main():
     ia.add_argument("--source", required=True, type=lambda s: Path(s).expanduser(), help="folder of *.toml agent files")
     ia.add_argument("--system", default="codex")
     add("render", help="regenerate READMEs, memory views and tools/*")
-    add("sync", help="install tools/* into each tool's global file (backed up)")
+    sy = add("sync", help="install tools/* into each tool's global file (backed up)")
+    sy.add_argument("--source-root", type=lambda s: Path(s).expanduser(),
+                    help="read tools/* from this copy (refresh.sh dry run) while comparing against --root's paths")
     a = ap.parse_args()
     if a.cmd == "memory":
         cmd_import(a) if a.mcmd == "import" else cmd_merge(a)

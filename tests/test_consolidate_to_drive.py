@@ -3,7 +3,8 @@ from tests.helpers import OPS, TempDirTest
 
 CONSOLIDATE = OPS / "dedup/consolidate_to_drive.py"
 
-# Fake rclone backed by a folder: copyto stores the file's md5 as an lsjson answer; lsjson reads it back.
+# Fake rclone backed by a folder: copyto stores the file's md5 as an lsjson answer (rclone's "MD5" key); lsjson reads it
+# back; a missing path exits 3 like rclone. copyto refuses to run without --ignore-existing.
 # $BAD_HASH makes uploads land with a wrong checksum; $READONLY makes the remote read-only.
 FAKE_RCLONE = r'''#!/bin/bash
 key() { printf '%s' "$1" | tr '/: ' '___'; }
@@ -12,8 +13,10 @@ case "$1" in
   lsjson) f="$FAKE/$(key "${@: -1}").json"
           if [ -f "$f" ]; then cat "$f"; elif [ -n "$AUTH_FAIL" ]; then echo "error: token expired" >&2; exit 1
           else echo "error listing: directory not found" >&2; exit 3; fi ;;
-  copyto) src="$3"; dst="$4"; sum=$(python3 -c 'import hashlib,sys; print(hashlib.md5(open(sys.argv[1],"rb").read()).hexdigest())' "$src"); [ -n "$BAD_HASH" ] && sum=bad
-          printf '[{"Path":"x","Hashes":{"md5":"%s"}}]' "$sum" > "$FAKE/$(key "$dst").json"; echo "$dst" >> "$FAKE/copies" ;;
+  copyto) src="${@: -2:1}"; dst="${@: -1}"
+          case " $* " in *" --ignore-existing "*) ;; *) echo "copyto without --ignore-existing" >&2; exit 9 ;; esac
+          sum=$(python3 -c 'import hashlib,sys; print(hashlib.md5(open(sys.argv[1],"rb").read()).hexdigest())' "$src"); [ -n "$BAD_HASH" ] && sum=bad
+          printf '[{"Path":"x","Hashes":{"MD5":"%s"}}]' "$sum" > "$FAKE/$(key "$dst").json"; echo "$dst" >> "$FAKE/copies" ;;
 esac
 '''
 

@@ -24,9 +24,9 @@ if [ -z "$APPLY" ]; then
   WORK="$(mktemp -d)/agent-home"
   trap 'rm -rf "$(dirname "$WORK")"' EXIT
   mkdir -p "$WORK"
-  tar -C "$ROOT" --exclude=.git -cf - . | tar -C "$WORK" -xf -
+  tar -C "$ROOT" --exclude=.git -chf - . | tar -C "$WORK" -xf -  # -h: copy link targets, so no write leaves $WORK
   echo "DRY RUN: previewing on a scratch copy ($WORK); $ROOT is not changed"
 fi
 python3 "$HERE/agent_fs.py" memory merge --root "$WORK" --apply
 python3 "$HERE/agent_fs.py" render --root "$WORK" --apply
-if [ "$SYNC" = 1 ]; then python3 "$HERE/agent_fs.py" sync --root "$WORK" $APPLY; fi
+if [ "$SYNC" = 1 ]; then python3 "$HERE/agent_fs.py" sync --root "$ROOT" --source-root "$WORK" $APPLY; fi

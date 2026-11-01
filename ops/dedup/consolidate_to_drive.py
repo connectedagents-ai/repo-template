@@ -15,7 +15,7 @@ Each file goes to <dest>/<path relative to --root>. Safety:
 - Refuses a read-only Google Drive remote (connect_cloud.sh default) and says how to allow writes.
 - MANIFEST.tsv and restore.sh (puts local files back; the cloud copy stays) are written and flushed after every file.
 """
-import argparse, csv, datetime, json, os, shlex, shutil, subprocess, sys
+import argparse, base64, csv, datetime, json, os, re, shlex, shutil, subprocess, sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -23,6 +23,17 @@ from dedup_merge import file_hashes  # noqa: E402
 from dedup_scan import SKIP_DIRS, extension, inside_git_tree  # noqa: E402
 
 COMPARABLE = ("md5", "sha1", "sha256", "quickxor")
+
+
+def hex_value(v):
+    """Checksums as lowercase hex; a base64 QuickXor (28 chars) is decoded."""
+    return base64.b64decode(v).hex() if re.fullmatch(r"[A-Za-z0-9+/]{27}=", v) else v.lower()
+
+
+def hash_name(name):
+    """rclone versions spell hash types differently (MD5 / md5, SHA-1 / sha1, QuickXorHash / quickxor)."""
+    n = name.lower().replace("-", "")
+    return "quickxor" if n.startswith("quickxor") else n
 
 
 def rclone(*args):
@@ -43,7 +54,7 @@ def remote_state(path):
     items = json.loads(r.stdout or "[]")
     if not items:
         return "missing", None
-    return "exists", {t: v for t, v in (items[0].get("Hashes") or {}).items() if v}
+    return "exists", {hash_name(t): hex_value(v) for t, v in (items[0].get("Hashes") or {}).items() if v}
 
 
 def same_content(local, remote):
@@ -111,7 +122,7 @@ def main():
                 status = "list-failed"
             elif state == "exists" and not same_content(p, before):
                 status = "conflict"  # different, or no checksum to prove it's the same: never overwrite
-            elif state == "missing" and rclone("copyto", "--checksum", str(p), target).returncode != 0:
+            elif state == "missing" and rclone("copyto", "--checksum", "--ignore-existing", str(p), target).returncode != 0:
                 status = "copy-failed"
             else:
                 after_state, after = remote_state(target)

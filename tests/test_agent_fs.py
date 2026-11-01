@@ -173,3 +173,45 @@ class AgentFsTest(TempDirTest):
         (entry,) = self.pack()
         self.assertEqual({s["platform"] for s in entry["sources"]}, {"claude", "grok"})
         self.assertNotIn("Trust", json.dumps(entry))
+
+    def test_fact_reimported_as_privileged_is_reclassified_and_scrubbed(self):
+        self.afs("init", "--root", self.root, "--apply")
+        f = self.tmp / "m.md"
+        f.write_text("- Settlement figure is high\n")
+        self.afs("memory", "import", "--root", self.root, "--platform", "claude", f, "--apply")
+        r = self.afs("memory", "import", "--root", self.root, "--platform", "claude", "--tag", "privileged", f, "--apply")
+        self.assertIn("1 reclassified as restricted", r.stdout)
+        self.afs("memory", "merge", "--root", self.root, "--apply")
+        self.assertNotIn("Settlement", (self.root / "memory/sources/claude/default.jsonl").read_text())
+        self.assertNotIn("Settlement", json.dumps(self.pack()))
+
+    def test_pointer_records_survive_export_to_another_agent_home(self):
+        self.afs("init", "--root", self.root, "--apply")
+        f = self.tmp / "fo.md"
+        f.write_text("- Trust schedule\n")
+        self.afs("memory", "import", "--root", self.root, "--platform", "claude", "--namespace", "family-office", f, "--apply")
+        other = self.tmp / "other-home"
+        self.afs("init", "--root", other, "--apply")
+        r = self.afs("memory", "import", "--root", other, "--platform", "claude",
+                     self.root / "memory/sources/claude/default.jsonl", "--apply")
+        self.assertIn("1 new items", r.stdout)
+        moved = (other / "memory/sources/claude/default.jsonl").read_text()
+        self.assertIn('"body_hash"', moved)
+        self.assertNotIn("Trust", moved)
+
+    def test_sync_preview_from_a_copy_compares_against_the_real_home(self):
+        self.built()
+        self.afs("sync", "--root", self.root, "--apply")
+        r = self.afs("sync", "--root", self.root, "--source-root", self.root)
+        self.assertIn("ok     claude", r.stdout)
+
+    def test_keyed_conflict_between_pointers_keeps_the_newest(self):
+        self.afs("init", "--root", self.root, "--apply")
+        for n, (body, year) in enumerate([("Trustee: Alpha", "2020"), ("Trustee: Beta", "2021")]):
+            f = self.tmp / f"t{n}.jsonl"
+            f.write_text(json.dumps({"body_md": body, "key": "trustee", "updated_at": f"{year}-01-01T00:00:00Z"}) + "\n")
+            self.afs("memory", "import", "--root", self.root, "--platform", "grok", "--namespace", "family-office", f, "--apply")
+        self.afs("memory", "merge", "--root", self.root, "--apply")
+        (entry,) = self.pack()
+        self.assertEqual(entry["updated_at"][:4], "2021")
+        self.assertNotIn("Alpha", (self.root / "memory/CONFLICTS.md").read_text())

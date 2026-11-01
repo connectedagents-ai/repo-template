@@ -83,3 +83,24 @@ class SkillsHubTest(TempDirTest):
         subprocess.run(["bash", str(restore)], cwd=self.tmp, check=True)
         self.assertFalse((self.tmp / "pwned").exists())
         self.assertIn("old", (self.home / ".claude/skills" / name / "SKILL.md").read_text())
+
+    def test_inventory_names_the_real_folder_even_when_its_link_is_scanned_first(self):
+        skill(self.tmp / "code/app/.claude/skills/ship", "ship")
+        (self.home / ".claude/skills").mkdir(parents=True)
+        (self.home / ".claude/skills/ship").symlink_to(self.tmp / "code/app/.claude/skills/ship", target_is_directory=True)
+        out = self.tmp / "skills.csv"
+        self.run_py(HUB, "inventory", "--scan-repos", self.tmp / "code", "--out", out, env=self.env)
+        with out.open() as f:
+            rows = {row["path"]: row for row in csv.DictReader(f)}
+        self.assertEqual(rows[str(self.tmp / "code/app/.claude/skills/ship")]["linked_to"], "")
+        self.assertEqual(rows[str(self.home / ".claude/skills/ship")]["linked_to"], str(self.tmp / "code/app/.claude/skills/ship"))
+
+    def test_archive_keeps_targets_apart(self):
+        skill(self.tmp / "hub/deploy", "deploy", body="canonical")
+        skill(self.home / "a/b/deploy", "deploy", body="one")
+        skill(self.home / "a_b/deploy", "deploy", body="two")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", "a/b", "--target", "a_b", "--apply", env=self.env)
+        (restore,) = (self.home / "Archive").glob("skills-replaced-*/restore.sh")
+        subprocess.run(["bash", str(restore)], check=True)
+        self.assertIn("one", (self.home / "a/b/deploy/SKILL.md").read_text())
+        self.assertIn("two", (self.home / "a_b/deploy/SKILL.md").read_text())

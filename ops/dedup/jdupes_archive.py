@@ -38,12 +38,13 @@ def plan(report, root, legal):
     rows, gone = [], 0
     for n, s in enumerate(report.get("matchSets", []), 1):
         paths = [os.path.abspath(f["filePath"]) for f in s["fileList"]]
+        held = any(legal.search(p) for p in paths)  # judged on the report, so a vanished legal copy still holds the set
         present = [p for p in paths if os.path.isfile(p)]
         gone += len(paths) - len(present)
         paths = [p for p in present if not skipped(p, root)]
         if len(paths) < 2:
             continue
-        if any(legal.search(p) for p in paths):
+        if held:
             rows += [(n, "flag-legal", s["fileSize"], p, "") for p in paths]
             continue
         keeper = min(paths, key=lambda p: (len(p), os.stat(p).st_mtime, p))

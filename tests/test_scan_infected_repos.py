@@ -14,13 +14,14 @@ case "$*" in
   *"repos/acme/locked/branches"*) echo '{"message":"Forbidden","status":"403"}'; exit 1 ;;
   *"--paginate repos/acme/hit/branches"*) printf 'main\nmega-1\n' ;;
   *"repos/acme/hit/branches"*) echo main ;;
-  *"repos/acme/wfdenied/contents/.github/workflows?ref=main -q"*) echo '{"message":"API rate limit exceeded","status":"403"}'; exit 1 ;;
+  *"ref=main repos/acme/wfdenied/contents/.github/workflows -q"*) echo '{"message":"API rate limit exceeded","status":"403"}'; exit 1 ;;
   *"branches"*) echo main ;;
-  *"repos/acme/old/commits"*) echo 2 ;;
+  *"sha=main -f author=ci-bot@automated.dev -f per_page=10 repos/acme/old/commits"*) echo 2 ;;
   *"commits"*) echo 0 ;;
-  *"repos/acme/hit/contents/.github/workflows?ref=mega-1 -q"*) echo megalodon.yml ;;
-  *"repos/acme/hit/contents/.github/workflows/megalodon.yml?ref=mega-1"*) echo "$BAD" ;;
-  *"repos/acme/clean/contents/.github/workflows?ref=main -q"*) echo ci.yml ;;
+  *"ref=mega-1 repos/acme/hit/contents/.github/workflows -q"*) printf 'megalodon.yml\nsecurity audit.yml\n' ;;
+  *"ref=mega-1 repos/acme/hit/contents/.github/workflows/megalodon.yml"*) echo "$BAD" ;;
+  *"ref=mega-1 repos/acme/hit/contents/.github/workflows/security%20audit.yml"*) echo "$BAD" ;;
+  *"ref=main repos/acme/clean/contents/.github/workflows -q"*) echo ci.yml ;;
   *"repos/acme/clean/contents/.github/workflows/ci.yml"*) echo "$GOOD" ;;
   *) echo '{"message":"Not Found","status":"404"}'; exit 1 ;;
 esac
@@ -41,7 +42,7 @@ class ScanInfectedReposTest(TempDirTest):
 
     def test_flags_bad_workflows_on_any_branch_and_build_bot_commits(self):
         text = self.scan()
-        self.assertIn("INFECTED  acme/hit@mega-1  build-bot commits: 0  bad workflows: megalodon.yml", text)
+        self.assertIn("INFECTED  acme/hit@mega-1  build-bot commits: 0  bad workflows: megalodon.yml security audit.yml", text)
         self.assertNotIn("acme/hit@main", text)
         self.assertIn("INFECTED  acme/old@main  build-bot commits: 2", text)
         self.assertNotIn("acme/clean", text)

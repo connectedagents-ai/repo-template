@@ -42,18 +42,21 @@ for owner in "$@"; do
       *) report "UNREACHABLE  ${owner}/${r}  (could not list branches)"; unreachable=$((unreachable + 1)); continue ;;
     esac
     for b in $branches; do
-      n="$(api "repos/${owner}/${r}/commits?sha=${b}&author=${BOT_EMAIL}&per_page=10" 'length')" || n="?"
+      # branch and file names go in as encoded parameters, so &, # or spaces can't change the request
+      n="$(api "repos/${owner}/${r}/commits" 'length' -X GET -f sha="$b" -f author="$BOT_EMAIL" -f per_page=10)" || n="?"
       bad=""
       wf_failed=""
-      wf="$(api "repos/${owner}/${r}/contents/.github/workflows?ref=${b}" '.[].name')"
+      wf="$(api "repos/${owner}/${r}/contents/.github/workflows" '.[].name' -X GET -f ref="$b")"
       case $? in 0|3) ;; *) wf_failed="workflow list" ;; esac  # 3 = no workflows folder
-      for f in $wf; do
-        if content="$(api "repos/${owner}/${r}/contents/.github/workflows/${f}?ref=${b}" '.content')"; then
+      while IFS= read -r f; do
+        [ -n "$f" ] || continue
+        enc="$(python3 -c 'import sys, urllib.parse; print(urllib.parse.quote(sys.argv[1]))' "$f")"
+        if content="$(api "repos/${owner}/${r}/contents/.github/workflows/${enc}" '.content' -X GET -f ref="$b")"; then
           printf '%s' "$content" | base64 -d 2>/dev/null | grep -qE "$IOC_PATTERN" && bad="$bad $f"
         else
           wf_failed="${wf_failed:+$wf_failed, }$f"
         fi
-      done
+      done <<< "$wf"
       failed=""
       [ "$n" = "?" ] && failed="commits"
       [ -n "$wf_failed" ] && failed="${failed:+$failed, }$wf_failed"

@@ -11,6 +11,9 @@ on:
 permissions:
   contents: write
   pull-requests: write
+concurrency:  # one refresh at a time; a newer push cancels an older run, so an old run never overwrites a newer refresh
+  group: refresh-agent-home
+  cancel-in-progress: true
 jobs:
   refresh:
     runs-on: ubuntu-latest
@@ -28,7 +31,16 @@ jobs:
           git config user.name "agent-home-refresh"
           git config user.email "agent-home-refresh@users.noreply.github.com"
           git add -A -- . ':!.tooling'
-          if git diff --cached --quiet; then echo "nothing to refresh"; exit 0; fi
+          if git diff --cached --quiet; then
+            echo "nothing to refresh"
+            # an open refresh PR from an earlier run is now stale: close it so it can't be merged
+            if gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -q OPEN; then
+              gh pr close "$BRANCH" --delete-branch --comment "main already matches the generated files; closing."
+            fi
+            exit 0
+          fi
+          git fetch -q origin main
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then echo "main moved on; the newer run publishes"; exit 0; fi
           git switch -c "$BRANCH"
           git commit -m "chore: refresh generated agent-home files"
           git push --force origin "$BRANCH"  # bot-only branch, rebuilt from main on every run
