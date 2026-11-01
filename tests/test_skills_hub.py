@@ -1,0 +1,116 @@
+import csv, subprocess
+from tests.helpers import OPS, TempDirTest
+
+HUB = OPS / "skills/skills_hub.py"
+
+
+def skill(folder, name, body="Do the thing.", description="Use when testing."):
+    folder.mkdir(parents=True, exist_ok=True)
+    (folder / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {description}\n---\n{body}\n")
+
+
+class SkillsHubTest(TempDirTest):
+    def setUp(self):
+        super().setUp()
+        self.home = self.tmp / "home"
+        self.env = {"HOME": str(self.home)}
+
+    def test_inventory_groups_copies_and_flags_bad_front_matter(self):
+        skill(self.home / ".claude/skills/deploy", "deploy")
+        skill(self.home / ".agents/skills/deploy", "deploy")
+        skill(self.home / ".cursor/skills/review", "review", body="v1")
+        skill(self.home / ".codex/skills/review", "review", body="v2")
+        skill(self.home / ".grok/skills/Bad_Name", "Bad_Name", description="")
+        out = self.tmp / "skills.csv"
+        r = self.run_py(HUB, "inventory", "--out", out, env=self.env)
+        with out.open() as f:
+            rows = {(row["name"], row["tool"]): row for row in csv.DictReader(f)}
+        self.assertEqual(rows[("deploy", "agents")]["duplicate"].split()[0], "identical")
+        self.assertEqual(rows[("review", "codex")]["duplicate"], "variant: merge")
+        self.assertIn("no description", rows[("Bad_Name", "grok")]["issues"])
+        self.assertIn("not kebab-case", rows[("Bad_Name", "grok")]["issues"])
+        self.assertIn("5 skills (0 more locations are links), 3 distinct names, 2 names with more than one copy", r.stdout)
+
+    def test_inventory_scans_repo_level_skill_folders(self):
+        skill(self.tmp / "code/app/.claude/skills/ship", "ship")
+        skill(self.tmp / "code/app/node_modules/pkg/.claude/skills/noise", "noise")
+        r = self.run_py(HUB, "inventory", "--scan-repos", self.tmp / "code", env=self.env)
+        self.assertIn("ship", r.stdout)
+        self.assertNotIn("noise", r.stdout)
+
+    def test_link_dry_run_changes_nothing(self):
+        skill(self.tmp / "hub/deploy", "deploy")
+        r = self.run_py(HUB, "link", "--hub", self.tmp / "hub", env=self.env)
+        self.assertIn("DRY RUN", r.stdout)
+        self.assertFalse((self.home / ".claude").exists())
+
+    def test_link_apply_archives_existing_copy_and_is_reversible(self):
+        skill(self.tmp / "hub/deploy", "deploy", body="canonical")
+        skill(self.home / ".claude/skills/deploy", "deploy", body="old local copy")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", "--apply", env=self.env)
+        dest = self.home / ".claude/skills/deploy"
+        self.assertTrue(dest.is_symlink())
+        self.assertIn("canonical", (dest / "SKILL.md").read_text())
+        (archive,) = (self.home / "Archive").glob("skills-replaced-*")
+        self.assertIn("old local copy", next(archive.rglob("SKILL.md")).read_text())
+        self.assertTrue((archive / "restore.sh").exists())
+        again = self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", env=self.env)
+        self.assertIn("nothing to do", again.stdout)
+
+    def test_hub_that_is_also_a_target_is_left_alone(self):
+        skill(self.home / ".agents/skills/deploy", "deploy", body="canonical")
+        r = self.run_py(HUB, "link", "--hub", self.home / ".agents/skills", "--target", ".agents/skills",
+                        "--target", ".claude/skills", "--apply", env=self.env)
+        self.assertIn("it is the hub itself", r.stdout)
+        self.assertFalse((self.home / ".agents/skills/deploy").is_symlink())
+        self.assertIn("canonical", (self.home / ".claude/skills/deploy/SKILL.md").read_text())
+        self.assertFalse((self.home / "Archive").exists())
+
+    def test_inventory_lists_every_linked_location_without_counting_copies(self):
+        skill(self.tmp / "hub/deploy", "deploy")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", "--target", ".codex/skills",
+                    "--apply", env=self.env)
+        r = self.run_py(HUB, "inventory", env=self.env)
+        self.assertIn("link to", r.stdout)
+        self.assertIn("1 skills (1 more locations are links)", r.stdout)
+
+    def test_restore_script_quotes_shell_characters(self):
+        name = "x$(touch pwned)"
+        skill(self.tmp / "hub" / name, "x")
+        skill(self.home / ".claude/skills" / name, "x", body="old")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", "--apply", env=self.env)
+        (restore,) = (self.home / "Archive").glob("skills-replaced-*/restore.sh")
+        subprocess.run(["bash", str(restore)], cwd=self.tmp, check=True)
+        self.assertFalse((self.tmp / "pwned").exists())
+        self.assertIn("old", (self.home / ".claude/skills" / name / "SKILL.md").read_text())
+
+    def test_inventory_names_the_real_folder_even_when_its_link_is_scanned_first(self):
+        skill(self.tmp / "code/app/.claude/skills/ship", "ship")
+        (self.home / ".claude/skills").mkdir(parents=True)
+        (self.home / ".claude/skills/ship").symlink_to(self.tmp / "code/app/.claude/skills/ship", target_is_directory=True)
+        out = self.tmp / "skills.csv"
+        self.run_py(HUB, "inventory", "--scan-repos", self.tmp / "code", "--out", out, env=self.env)
+        with out.open() as f:
+            rows = {row["path"]: row for row in csv.DictReader(f)}
+        self.assertEqual(rows[str(self.tmp / "code/app/.claude/skills/ship")]["linked_to"], "")
+        self.assertEqual(rows[str(self.home / ".claude/skills/ship")]["linked_to"], str(self.tmp / "code/app/.claude/skills/ship"))
+
+    def test_archive_keeps_targets_apart(self):
+        skill(self.tmp / "hub/deploy", "deploy", body="canonical")
+        skill(self.home / "a/b/deploy", "deploy", body="one")
+        skill(self.home / "a_b/deploy", "deploy", body="two")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", "a/b", "--target", "a_b", "--apply", env=self.env)
+        (restore,) = (self.home / "Archive").glob("skills-replaced-*/restore.sh")
+        subprocess.run(["bash", str(restore)], check=True)
+        self.assertIn("one", (self.home / "a/b/deploy/SKILL.md").read_text())
+        self.assertIn("two", (self.home / "a_b/deploy/SKILL.md").read_text())
+
+    def test_a_target_given_twice_is_archived_once_and_restores(self):
+        skill(self.tmp / "hub/deploy", "deploy", body="canonical")
+        skill(self.home / ".claude/skills/deploy", "deploy", body="original")
+        self.run_py(HUB, "link", "--hub", self.tmp / "hub", "--target", ".claude/skills", "--target", ".claude/skills",
+                    "--apply", env=self.env)
+        (restore,) = (self.home / "Archive").glob("skills-replaced-*/restore.sh")
+        self.assertEqual(restore.read_text().count("mv "), 1)
+        subprocess.run(["bash", str(restore)], check=True)
+        self.assertIn("original", (self.home / ".claude/skills/deploy/SKILL.md").read_text())

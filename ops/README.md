@@ -1,6 +1,7 @@
 # Consolidation runbook
 
 Everything here is **dry-run by default**, copies or archives instead of deleting, and logs what it did. Run the steps in order.
+The phase-by-phase build order that ties these steps together is `../docs/UNIFIED-AI-WORKSPACE.md`.
 **Run every command from the `ops/` folder:** `cd ~/Code/connectedagents-ai/repo-template/ops` (paths below are relative to it).
 **Easiest way in:** `bash start.sh` opens a numbered menu of every safe (read-only or preview) step below, and saves the reports to `~/ops-reports/`.
 (After consolidation, move `ops/` into `agent-central-config` and delete it from the template.)
@@ -18,6 +19,8 @@ Everything here is **dry-run by default**, copies or archives instead of deletin
 | 3b | Reset the Claude app/account itself (export → chats, projects, artifacts, scheduled, skills, connectors, plugins, extensions, memory) | `mac-cleanup/CLAUDE-APP-RESET.md` |
 | 3c | **Dedup** every surface (Mac, cloud folders, iCloud, and via their APIs Google Drive, OneDrive, SharePoint, pCloud): parallel dry-run scan → plan → approved archive (SSD, or each cloud's own archive folder) | `dedup/README.md` · `bash dedup/connect_cloud.sh` · `bash dedup/start_here.sh` |
 | 3e | Microsoft tenants: finish the netzerolending.io move (mail done 2026-05-21, files not yet), personal OneDrive, retire the old tenant | `microsoft/TENANT-MIGRATION.md` |
+| 3f | **Skills:** inventory every SKILL.md across tools, merge duplicates, link one canonical set into Claude, Codex, Cursor and Antigravity | `python3 skills/skills_hub.py inventory` → `link --hub <config>/skills` → `--apply` |
+| 3g | **Agent home + shared memory:** one private repo with every agent's folder and one memory pack, generated READMEs, synced into every tool | `python3 agents/agent_fs.py init --root <private repo>` → `memory import` → `bash agents/refresh.sh --root <repo> --apply` · `../docs/AGENT-FILESYSTEM.md` |
 | 3d | Wire **Codex + Grok CLI** (and every AI tool) to one core MCP set, one install per CLI, and audit agent access (bot vaults, AI OAuth apps) | `mcp/README.md` · `mcp/park_mcp_servers.py` |
 | 4 | Reset global agent config | copy `mac-cleanup/templates/CLAUDE.md` + `settings.json` into `~/.claude/`. Configure the other CLIs and IDEs per `../docs/GITHUB-SETUP.md` §7 |
 | 5 | Set up the GitHub org, apps, Copilot and CLI | preview `bash github-setup/configure_github.sh <ORG>`, then `--apply --create-repos` · the web-only steps in `../docs/GITHUB-SETUP.md` §2–§5 |

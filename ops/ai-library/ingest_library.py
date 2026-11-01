@@ -9,6 +9,7 @@
 Layout written under --library (default ~/Archive/ai-library-raw, a PRIVATE store that is not a git repo):
     skills/<name>/                   any folder that contains SKILL.md (portable Agent Skills format)
     sources/<source>/<account>/<kind>/<file>   everything else, kind = docs | forms | templates | data | code | media | other
+                                     (or memory, with --kind memory: saved memories and custom instructions)
     catalog.json                     one entry per unique file (sha256), with every original path it came from
     INDEX.md                         regenerated table of contents
 
@@ -199,6 +200,7 @@ def main():
                     help="raw export store: private, NOT a git repo. Promote reviewed items into the ai-library repo by hand")
     ap.add_argument("--min-free-gb", type=float, default=15, help="refuse to copy if less than this would remain free")
     ap.add_argument("--allow-git", action="store_true", help="allow --library inside a git work tree (only for sanitized input)")
+    ap.add_argument("--kind", choices=["memory"], help="file every item under this kind, e.g. memory exports (saved memories, custom instructions)")
     ap.add_argument("--apply", action="store_true")
     a = ap.parse_args()
 
@@ -278,7 +280,7 @@ def main():
                     if CHATGPT_CONVERSATIONS.fullmatch(f.name):  # same export, maybe another account: still split it here
                         stats["chats"] = stats.get("chats", 0) + split_chatgpt(f, chats_dir, a.apply, a.min_free_gb)
                     continue
-                k = kind_of(f)
+                k = a.kind or kind_of(f)
                 dest = lib / "sources" / slug(a.source) / slug(a.account) / k / slug(f.name)
                 n = 1
                 while dest.exists():

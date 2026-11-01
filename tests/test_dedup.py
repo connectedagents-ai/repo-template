@@ -1,4 +1,5 @@
 import csv, importlib.util, io, subprocess
+from pathlib import Path
 from contextlib import redirect_stderr, redirect_stdout
 from unittest import mock
 from tests.helpers import OPS, TempDirTest
@@ -24,6 +25,47 @@ class DedupPipelineTest(TempDirTest):
     def test_legal_paths_are_never_planned_for_archive(self):
         _, run = self.plan({"a/court-filing.pdf": "x" * 50, "b/court-filing copy.pdf": "x" * 50})
         self.assertNotIn("archive", {r["action"] for r in self.rows(run)})
+
+    def scanned(self, files, *flags):
+        home, run = self.tmp / "home", self.tmp / "run"
+        for rel in files:
+            (home / rel).parent.mkdir(parents=True, exist_ok=True)
+            (home / rel).write_text("x" * 20)
+        self.run_py(SCAN, "--surface", "s", "--root", home, "--out", run, *flags)
+        with open(run / "inventory-s.csv", newline="") as f:
+            return {str(Path(r["path"]).relative_to(home)) for r in csv.DictReader(f)}
+
+    def test_ext_allowlist_keeps_only_listed_types(self):
+        got = self.scanned(["a/ledger.PDF", "a/sheet.xlsx", "a/app.js", "a/.memo.pdf.icloud"], "--ext", "pdf", "--ext", ".xlsx")
+        self.assertEqual(got, {"a/ledger.PDF", "a/sheet.xlsx", "a/.memo.pdf.icloud"})
+
+    def test_skip_repos_skips_whole_repos_and_skip_dirs_always_apply(self):
+        files = ["docs/a.pdf", "proj/.git/HEAD", "proj/src/main.py", "other/node_modules/pkg/index.js"]
+        self.assertEqual(self.scanned(files, "--skip-repos"), {"docs/a.pdf"})
+        self.assertIn("proj/src/main.py", self.scanned(files))
+
+    def test_skip_repos_still_scans_a_folder_a_parent_repo_does_not_track(self):
+        home, run = self.tmp / "home", self.tmp / "run"
+        (home / "Desktop").mkdir(parents=True)
+        (home / ".zshrc").write_text("x")
+        (home / "Desktop/memo.pdf").write_text("x" * 20)
+        git = ["git", "-C", str(home), "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run(git[:3] + ["init", "-q"], check=True)
+        subprocess.run(git + ["add", ".zshrc"], check=True)
+        subprocess.run(git + ["commit", "-qm", "dotfiles"], check=True)
+        self.run_py(SCAN, "--surface", "s", "--root", home / "Desktop", "--out", run, "--skip-repos")
+        with open(run / "inventory-s.csv", newline="") as f:
+            self.assertEqual([Path(r["path"]).name for r in csv.DictReader(f)], ["memo.pdf"])
+
+    def test_skip_repos_skips_a_root_that_is_inside_a_repo(self):
+        repo, run = self.tmp / "repo", self.tmp / "run"
+        (repo / ".git").mkdir(parents=True)
+        (repo / "docs").mkdir()
+        (repo / "docs/tracked.pdf").write_text("x" * 20)
+        r = self.run_py(SCAN, "--surface", "s", "--root", repo / "docs", "--out", run, "--skip-repos")
+        self.assertIn("inside a git repo", r.stderr)
+        with open(run / "inventory-s.csv", newline="") as f:
+            self.assertEqual(list(csv.DictReader(f)), [])
 
     def test_apply_moves_duplicate_and_restore_script_puts_it_back(self):
         weird = "b/it's $(touch pwned) \"q\".txt"
