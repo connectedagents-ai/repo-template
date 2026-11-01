@@ -30,18 +30,26 @@ jobs:
         run: |
           git config user.name "agent-home-refresh"
           git config user.email "agent-home-refresh@users.noreply.github.com"
-          git add -A -- . ':!.tooling'
-          if git diff --cached --quiet; then
-            echo "nothing to refresh"
-            # an open refresh PR from an earlier run is now stale: close it so it can't be merged
+          # nothing to publish: an open refresh PR from an earlier run is now stale, so close it (it can't be merged)
+          up_to_date() {
+            echo "main already matches the generated files"
             if gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -q OPEN; then
               gh pr close "$BRANCH" --delete-branch --comment "main already matches the generated files; closing."
             fi
             exit 0
-          fi
+          }
+          git add -A -- . ':!.tooling'
+          if git diff --cached --quiet; then up_to_date; fi
           git fetch -q origin main
-          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then echo "main moved on; the newer run publishes"; exit 0; fi
-          git switch -c "$BRANCH"
+          if [ "$(git rev-parse origin/main)" != "$GITHUB_SHA" ]; then
+            # main moved during this run (any push, filtered or not): regenerate from the latest main instead of
+            # publishing stale files or dropping the refresh
+            git reset -q --hard origin/main
+            bash .tooling/ops/agents/refresh.sh --root . --apply --no-sync
+            git add -A -- . ':!.tooling'
+            if git diff --cached --quiet; then up_to_date; fi
+          fi
+          git switch -C "$BRANCH"
           git commit -m "chore: refresh generated agent-home files"
           git push --force origin "$BRANCH"  # bot-only branch, rebuilt from main on every run
           gh pr view "$BRANCH" --json state -q .state 2>/dev/null | grep -q OPEN ||
