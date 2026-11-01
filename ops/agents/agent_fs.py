@@ -249,14 +249,16 @@ def cmd_merge(a):
         if ns in GENERAL and flagged:
             refused.append(i)
             continue
-        fid = h(f"{ns}|{norm(i['body_md']) if i.get('body_md') is not None else i['body_hash']}")
+        # one identity for a fact whether a source kept its text or only its hash (pointer)
+        fid = h(f"{ns}|{i.get('body_hash') or h(norm(i['body_md']), 32)}")
         src = {"platform": i["platform"], "account": i["account"], "source_url": i["source_url"], "updated_at": i["updated_at"]}
         entry = pack.setdefault(fid, {"id": fid, "namespace": ns, "key": i.get("key"), "sources": []})
         entry["sources"].append(src)
         entry["updated_at"] = i["updated_at"]
         entry.pop("superseded_by", None)  # a fact restated later is current again
         if ns in RESTRICTED:
-            entry.update(title=i["title"], body_md=None)
+            title = i["title"] if i.get("body_md") is None else f"[{ns}] item {i['provenance_hash'][:8]}"
+            entry.update(title=title, body_md=None)  # a source that still holds text never lends it a title
         else:
             entry.update(title=i["title"], body_md=i["body_md"])
         if i.get("key"):

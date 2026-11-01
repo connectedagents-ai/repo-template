@@ -157,3 +157,19 @@ class AgentFsTest(TempDirTest):
         r = self.afs("memory", "import", "--root", self.root, "--platform", "claude", empty, "--apply")
         self.assertIn("1 restricted bodies removed", r.stdout)
         self.assertNotIn("Secret", dest.read_text())
+
+    def test_pointer_and_inlined_copies_of_a_restricted_fact_merge_into_one(self):
+        self.afs("init", "--root", self.root, "--apply")
+        f = self.tmp / "fo.md"
+        f.write_text("- Trust distribution schedule\n")
+        self.afs("memory", "import", "--root", self.root, "--platform", "claude", "--namespace", "family-office", f, "--apply")
+        legacy = self.root / "memory/sources/grok/old.jsonl"
+        legacy.parent.mkdir(parents=True)
+        legacy.write_text(json.dumps({"platform": "grok", "account": "old", "title": "Trust distribution schedule",
+                                      "body_md": "Trust distribution schedule", "updated_at": "2020-01-01T00:00:00Z",
+                                      "tags": [], "provenance_hash": "b" * 32, "namespace": "family-office",
+                                      "source_url": "s"}) + "\n")
+        self.afs("memory", "merge", "--root", self.root, "--apply")
+        (entry,) = self.pack()
+        self.assertEqual({s["platform"] for s in entry["sources"]}, {"claude", "grok"})
+        self.assertNotIn("Trust", json.dumps(entry))

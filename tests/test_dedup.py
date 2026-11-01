@@ -44,6 +44,19 @@ class DedupPipelineTest(TempDirTest):
         self.assertEqual(self.scanned(files, "--skip-repos"), {"docs/a.pdf"})
         self.assertIn("proj/src/main.py", self.scanned(files))
 
+    def test_skip_repos_still_scans_a_folder_a_parent_repo_does_not_track(self):
+        home, run = self.tmp / "home", self.tmp / "run"
+        (home / "Desktop").mkdir(parents=True)
+        (home / ".zshrc").write_text("x")
+        (home / "Desktop/memo.pdf").write_text("x" * 20)
+        git = ["git", "-C", str(home), "-c", "user.name=t", "-c", "user.email=t@t"]
+        subprocess.run(git[:3] + ["init", "-q"], check=True)
+        subprocess.run(git + ["add", ".zshrc"], check=True)
+        subprocess.run(git + ["commit", "-qm", "dotfiles"], check=True)
+        self.run_py(SCAN, "--surface", "s", "--root", home / "Desktop", "--out", run, "--skip-repos")
+        with open(run / "inventory-s.csv", newline="") as f:
+            self.assertEqual([Path(r["path"]).name for r in csv.DictReader(f)], ["memo.pdf"])
+
     def test_skip_repos_skips_a_root_that_is_inside_a_repo(self):
         repo, run = self.tmp / "repo", self.tmp / "run"
         (repo / ".git").mkdir(parents=True)

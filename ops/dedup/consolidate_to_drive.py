@@ -20,7 +20,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from dedup_merge import file_hashes  # noqa: E402
-from dedup_scan import SKIP_DIRS, extension  # noqa: E402
+from dedup_scan import SKIP_DIRS, extension, inside_git_tree  # noqa: E402
 
 COMPARABLE = ("md5", "sha1", "sha256", "quickxor")
 
@@ -54,10 +54,6 @@ def same_content(local, remote):
     return any(mine.get(t) == remote[t] for t in types)
 
 
-def in_git_tree(path):
-    return any((p / ".git").exists() for p in [path, *path.parents])
-
-
 def sources(root, exts, skip):
     for dirpath, dirnames, filenames in os.walk(root):
         dirnames[:] = [d for d in dirnames if d not in SKIP_DIRS and not os.path.lexists(os.path.join(dirpath, d, ".git"))]
@@ -80,7 +76,7 @@ def main():
     root = a.root.expanduser().resolve()
     if not root.is_dir():
         sys.exit(f"no folder at {root}")
-    if in_git_tree(root):
+    if inside_git_tree(root):
         sys.exit(f"refusing: {root} is inside a git work tree (code is pushed with git, not copied to Drive)")
     if ":" not in a.dest:
         sys.exit("--dest must be an rclone remote, e.g. gdrive-personal:Master")

@@ -12,7 +12,7 @@ are recorded with local=0 and are never opened, so no download is ever triggered
 Legal-looking paths are flagged legal=1; later phases never plan to move them.
 --ext limits the scan to those file types; --skip-repos skips every folder that is a git repo (its tracked files too).
 """
-import argparse, csv, os, re, stat, sys
+import argparse, csv, os, re, stat, sys, subprocess
 from pathlib import Path
 
 SF_DATALESS = 0x40000000  # macOS: file content is not on disk (cloud placeholder)
@@ -36,8 +36,18 @@ def keep_dir(dirpath, d, root_dev, skip_repos):
 
 
 def inside_git_tree(path):
+    """True if `path` is a repo, or a repo above it tracks files under it. A repo higher up that tracks nothing here
+    (a dotfiles repo at ~, say) doesn't count, so Desktop or Documents can still be scanned."""
     path = path.resolve()
-    return any((p / ".git").exists() for p in [path, *path.parents])
+    if (path / ".git").exists():
+        return True
+    if not any((p / ".git").exists() for p in path.parents):
+        return False
+    try:
+        r = subprocess.run(["git", "-C", str(path), "ls-files", "--", "."], capture_output=True, text=True)
+    except OSError:
+        return True
+    return r.returncode != 0 or bool(r.stdout.strip())  # can't tell: treat as code, never move it
 
 
 def main():
